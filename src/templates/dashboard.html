@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - CyberSpace Security Lab</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .navbar {
+            background: white;
+            padding: 15px 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        
+        .navbar h1 {
+            color: #333;
+            font-size: 24px;
+        }
+        
+        .navbar-right {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+        
+        .user-info {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .logout-btn {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+        
+        .logout-btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .success-message {
+            background: #efe;
+            border-left: 4px solid #3c3;
+            color: #3c3;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .success-message.show {
+            display: block;
+            animation: slideIn 0.3s ease-in;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            padding: 25px;
+        }
+        
+        .card h2 {
+            color: #333;
+            font-size: 18px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .stat-value {
+            font-size: 36px;
+            color: #667eea;
+            font-weight: bold;
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .stat-label {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .user-details {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+        
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 14px;
+        }
+        
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+        
+        .detail-label {
+            color: #666;
+            font-weight: 600;
+        }
+        
+        .detail-value {
+            color: #333;
+        }
+        
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .search-box input {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        .search-box button {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+        
+        .search-box button:hover {
+            background: #764ba2;
+        }
+        
+        .export-btn {
+            padding: 10px 15px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: background 0.3s;
+            margin-top: 10px;
+        }
+        
+        .export-btn:hover {
+            background: #218838;
+        }
+        
+        .table-container {
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        
+        thead {
+            background: #f9f9f9;
+        }
+        
+        th {
+            padding: 12px;
+            text-align: left;
+            color: #333;
+            font-weight: 600;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e0e0e0;
+            color: #666;
+        }
+        
+        tr:hover {
+            background: #f9f9f9;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-failed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .status-logout {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #667eea;
+            padding: 20px;
+            display: none;
+        }
+        
+        .error-message {
+            background: #fee;
+            border-left: 4px solid #c33;
+            color: #c33;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .error-message.show {
+            display: block;
+        }
+        
+        .full-width {
+            grid-column: 1 / -1;
+        }
+        
+        .pagination {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .pagination button {
+            padding: 8px 12px;
+            border: 1px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .pagination button.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .pagination button:hover {
+            background: #667eea;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <h1>🔐 CyberSpace Security Lab - Dashboard</h1>
+        <div class="navbar-right">
+            <div class="user-info">
+                Welcome, <strong id="usernameDisplay"></strong>
+            </div>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="success-message" id="successMessage">
+            ✓ Login successful! Welcome to the dashboard.
+        </div>
+        
+        <div class="error-message" id="errorMessage"></div>
+
+        <!-- Statistics Cards -->
+        <div class="grid">
+            <div class="card">
+                <h2>📊 Total Users</h2>
+                <div class="stat-value" id="totalUsers">-</div>
+                <div class="stat-label">Registered users</div>
+            </div>
+
+            <div class="card">
+                <h2>✅ Successful Logins</h2>
+                <div class="stat-value" id="successfulLogins">-</div>
+                <div class="stat-label">Today</div>
+            </div>
+
+            <div class="card">
+                <h2>❌ Failed Logins</h2>
+                <div class="stat-value" id="failedLogins">-</div>
+                <div class="stat-label">Today</div>
+            </div>
+        </div>
+
+        <!-- User Information Section -->
+        <div class="card full-width">
+            <h2>👤 Your Account Information</h2>
+            <div class="user-details" id="userDetailsContainer">
+                <div class="loading">Loading user information...</div>
+            </div>
+            <button class="export-btn" onclick="exportUserData()">📥 Export User Data as JSON</button>
+        </div>
+
+        <!-- Search User Section -->
+        <div class="card full-width">
+            <h2>🔍 Search User Information</h2>
+            <div class="search-box">
+                <input type="text" id="searchUsername" placeholder="Enter username to search...">
+                <button onclick="searchUser()">Search</button>
+            </div>
+            <div class="user-details" id="searchResultContainer" style="display: none;">
+                <div class="loading" id="searchLoading">Loading...</div>
+                <div id="searchResult"></div>
+            </div>
+        </div>
+
+        <!-- Login Statistics Section -->
+        <div class="card full-width">
+            <h2>📈 Login History & Statistics</h2>
+            
+            <div style="margin-bottom: 15px;">
+                <label style="font-weight: 600; color: #333; display: block; margin-bottom: 8px;">Filter by Username (optional):</label>
+                <div class="search-box" style="margin-bottom: 0;">
+                    <input type="text" id="filterUsername" placeholder="Leave empty for all users...">
+                    <button onclick="loadLoginLogs()">Apply Filter</button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Status</th>
+                            <th>Timestamp</th>
+                            <th>IP Address</th>
+                            <th>User Agent</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logsTableBody">
+                        <tr>
+                            <td colspan="5" style="text-align: center; padding: 30px;">
+                                <div class="loading" style="display: block; margin: 0;">Loading login history...</div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pagination" id="paginationContainer"></div>
+            
+            <button class="export-btn" onclick="exportLoginLogs()">📥 Export Login Logs as CSV</button>
+        </div>
+    </div>
+
+    <script>
+        let currentPage = 1;
+        const logsPerPage = 20;
+        let allLogs = [];
+
+        // Initialize dashboard on page load
+        document.addEventListener('DOMContentLoaded', async () => {
+            showSuccessMessage();
+            await loadUserInfo();
+            await loadStatistics();
+            await loadLoginLogs();
+        });
+
+        function showSuccessMessage() {
+            const successDiv = document.getElementById('successMessage');
+            successDiv.classList.add('show');
+            setTimeout(() => {
+                successDiv.classList.remove('show');
+            }, 5000);
+        }
+
+        async function loadUserInfo() {
+            try {
+                const response = await fetch('/api/user');
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('usernameDisplay').textContent = data.username;
+                    
+                    // Fetch detailed user info from server
+                    const detailedResponse = await fetch(`/api/user-details/${data.username}`);
+                    const detailedData = await detailedResponse.json();
+
+                    if (detailedData.success) {
+                        displayUserDetails(detailedData.user);
+                    }
+                }
+            } catch (error) {
+                showError('Failed to load user information');
+            }
+        }
+
+        function displayUserDetails(user) {
+            const container = document.getElementById('userDetailsContainer');
+            container.innerHTML = `
+                <div class="detail-row">
+                    <span class="detail-label">Username:</span>
+                    <span class="detail-value">${user.username}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Hash Mode:</span>
+                    <span class="detail-value">${user.hash_mode}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Group Seed:</span>
+                    <span class="detail-value">${user.group_seed}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Account Created:</span>
+                    <span class="detail-value">${new Date(user.created_at).toLocaleString()}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Has Salt:</span>
+                    <span class="detail-value">${user.salt ? 'Yes' : 'No'}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Metadata:</span>
+                    <span class="detail-value">${user.metadata || 'None'}</span>
+                </div>
+            `;
+        }
+
+        async function loadStatistics() {
+            try {
+                const response = await fetch('/api/statistics');
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('totalUsers').textContent = data.totalUsers;
+                    document.getElementById('successfulLogins').textContent = data.successfulLogins;
+                    document.getElementById('failedLogins').textContent = data.failedLogins;
+                }
+            } catch (error) {
+                console.error('Failed to load statistics:', error);
+            }
+        }
+
+        async function loadLoginLogs(page = 1) {
+            try {
+                currentPage = page;
+                const username = document.getElementById('filterUsername').value.trim() || null;
+                
+                const url = new URL('/api/login-logs', window.location.origin);
+                if (username) {
+                    url.searchParams.append('username', username);
+                }
+                url.searchParams.append('limit', 1000);
+
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.success) {
+                    allLogs = data.logs;
+                    displayLogsPaginated();
+                }
+            } catch (error) {
+                showError('Failed to load login logs');
+            }
+        }
+
+        function displayLogsPaginated() {
+            const startIdx = (currentPage - 1) * logsPerPage;
+            const endIdx = startIdx + logsPerPage;
+            const paginatedLogs = allLogs.slice(startIdx, endIdx);
+
+            const tableBody = document.getElementById('logsTableBody');
+            
+            if (paginatedLogs.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #999;">No login logs found</td></tr>';
+                return;
+            }
+
+            tableBody.innerHTML = paginatedLogs.map(log => `
+                <tr>
+                    <td>${log.username}</td>
+                    <td>
+                        <span class="status-badge status-${log.status}">
+                            ${log.status.charAt(0).toUpperCase() + log.status.slice(1)}
+                        </span>
+                    </td>
+                    <td>${new Date(log.timestamp).toLocaleString()}</td>
+                    <td>${log.ip_address}</td>
+                    <td title="${log.user_agent}" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${log.user_agent}</td>
+                </tr>
+            `).join('');
+
+            updatePagination();
+        }
+
+        function updatePagination() {
+            const totalPages = Math.ceil(allLogs.length / logsPerPage);
+            const paginationContainer = document.getElementById('paginationContainer');
+            
+            if (totalPages <= 1) {
+                paginationContainer.innerHTML = '';
+                return;
+            }
+
+            let html = '';
+            
+            if (currentPage > 1) {
+                html += `<button onclick="loadLoginLogs(1)">« First</button>`;
+                html += `<button onclick="loadLoginLogs(${currentPage - 1})">‹ Prev</button>`;
+            }
+
+            for (let i = Math.max(1, currentPage - 2); i <= Math.min(totalPages, currentPage + 2); i++) {
+                if (i === currentPage) {
+                    html += `<button class="active">${i}</button>`;
+                } else {
+                    html += `<button onclick="loadLoginLogs(${i})">${i}</button>`;
+                }
+            }
+
+            if (currentPage < totalPages) {
+                html += `<button onclick="loadLoginLogs(${currentPage + 1})">Next ›</button>`;
+                html += `<button onclick="loadLoginLogs(${totalPages})">Last »</button>`;
+            }
+
+            paginationContainer.innerHTML = html;
+        }
+
+        async function searchUser() {
+            const username = document.getElementById('searchUsername').value.trim();
+            
+            if (!username) {
+                showError('Please enter a username');
+                return;
+            }
+
+            const container = document.getElementById('searchResultContainer');
+            container.style.display = 'block';
+
+            try {
+                const response = await fetch(`/api/user-details/${username}`);
+                const data = await response.json();
+
+                const searchResult = document.getElementById('searchResult');
+                
+                if (data.success) {
+                    searchResult.innerHTML = '';
+                    displayUserDetails(data.user);
+                    document.getElementById('userDetailsContainer').innerHTML = document.getElementById('userDetailsContainer').innerHTML;
+                } else {
+                    searchResult.innerHTML = `<div style="text-align: center; color: #c33; padding: 20px;">User not found</div>`;
+                }
+            } catch (error) {
+                showError('Failed to search user');
+            }
+        }
+
+        function exportUserData() {
+            const username = document.getElementById('usernameDisplay').textContent;
+            const details = document.getElementById('userDetailsContainer').textContent;
+            
+            const data = {
+                username: username,
+                exportedAt: new Date().toISOString(),
+                details: details
+            };
+
+            const jsonString = JSON.stringify(data, null, 2);
+            downloadFile(jsonString, `user_${username}_${Date.now()}.json`, 'application/json');
+        }
+
+        function exportLoginLogs() {
+            let csv = 'Username,Status,Timestamp,IP Address,User Agent\n';
+            
+            allLogs.forEach(log => {
+                csv += `"${log.username}","${log.status}","${log.timestamp}","${log.ip_address}","${log.user_agent}"\n`;
+            });
+
+            downloadFile(csv, `login_logs_${Date.now()}.csv`, 'text/csv');
+        }
+
+        function downloadFile(content, filename, type) {
+            const element = document.createElement('a');
+            element.setAttribute('href', `data:${type};charset=utf-8,${encodeURIComponent(content)}`);
+            element.setAttribute('download', filename);
+            element.style.display = 'none';
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.classList.add('show');
+            setTimeout(() => {
+                errorDiv.classList.remove('show');
+            }, 5000);
+        }
+
+        async function logout() {
+            try {
+                const response = await fetch('/api/logout', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    window.location.href = '/login';
+                }
+            } catch (error) {
+                showError('Logout failed');
+            }
+        }
+    </script>
+</body>
+</html>
