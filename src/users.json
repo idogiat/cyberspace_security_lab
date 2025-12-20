@@ -1,0 +1,13 @@
+{
+    "group_seed": 524392612,
+    "users": [
+        {
+            "name": "",
+            "totp_secret": ""
+        },
+        {
+            "name": "",
+            "totp_secret": ""
+        }
+    ]
+}
