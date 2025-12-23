@@ -87,6 +87,26 @@
             color: #666;
         }
         
+        .form-group input[type="checkbox"] {
+            accent-color: #667eea; 
+            width: 18px;
+            height: 18px;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+
+        .form-group label input[type="checkbox"] + span {
+            vertical-align: middle;
+        }
+
+        .form-group label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
         .requirement {
             margin: 5px 0;
             display: flex;
@@ -213,6 +233,13 @@
                     <option value="SHA-256 + SALT + PEPPER">SHA-256 + SALT + PEPPER</option>
                 </select>
             </div>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="useTotp" name="useTotp">
+                     Add TOTP (Two Factor Authentication)
+                </label>
+            </div>
             
             <div class="password-requirements">
                 <strong>Password Requirements:</strong>
@@ -293,6 +320,7 @@
             const password = passwordInput.value;
             const confirmPassword = confirmPasswordInput.value;
             const hashMode = document.getElementById('hashMode').value;
+            const useTotp = document.getElementById('useTotp').checked;
 
             // Validate inputs
             if (username.length < 3) {
@@ -315,6 +343,7 @@
                 return;
             }
 
+
             errorDiv.style.display = 'none';
             successDiv.style.display = 'none';
             document.getElementById('loading').style.display = 'block';
@@ -326,17 +355,20 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ username, password, hash_mode: hashMode })
-                });
+                body: JSON.stringify({ username, password, hash_mode: hashMode, use_totp: useTotp })});
 
                 const data = await response.json();
 
                 if (data.success) {
-                    showSuccess(data.message);
-                    form.reset();
-                    setTimeout(() => {
-                        window.location.href = '/login';
-                    }, 2000);
+                    if (data.totp_secret) {
+                        showTotpSecret(data.totp_secret);
+                    } else {
+                        showSuccess(data.message);
+                        form.reset();
+                        setTimeout(() => {
+                            window.location.href = '/login';
+                        }, 2000);
+                    }
                 } else {
                     showError(data.message || 'Registration failed');
                 }
@@ -347,6 +379,34 @@
                 submitBtn.disabled = false;
             }
         });
+
+        function showTotpSecret(secret) {
+            // creates a pop up window for TOTP
+            const modal = document.createElement('div');
+            modal.style.position = 'fixed';
+            modal.style.left = 0;
+            modal.style.top = 0;
+            modal.style.width = '100vw';
+            modal.style.height = '100vh';
+            modal.style.background = 'rgba(0,0,0,0.5)';
+            modal.style.display = 'flex';
+            modal.style.alignItems = 'center';
+            modal.style.justifyContent = 'center';
+            modal.innerHTML = `
+                <div style="background:white;padding:25px 20px;border-radius:10px;max-width:350px;text-align:center;">
+                    <h2>Two-Factor Authentication</h2>
+                    <p style="margin:16px 0;">Your TOTP secret:<br>
+                    <strong style="word-break:break-all;font-size:1.2em;color:#667eea;">${secret}</strong></p>
+                    <p style="font-size:13px;color:#555;">Save this code in your authenticator app.<br>It will not appear again!</p>
+                    <button id="okTotpBtn" style="margin-top:18px;padding:8px 30px;border-radius:4px;background:#667eea;color:white;border:none;font-weight:bold;">OK</button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            document.getElementById('okTotpBtn').onclick = () => {
+                document.body.removeChild(modal);
+                window.location.href = '/login';
+            };
+        }
 
         function showError(message) {
             errorDiv.textContent = message;
@@ -359,7 +419,7 @@
             successDiv.style.display = 'block';
             errorDiv.style.display = 'none';
         }
-
+        
         // Initialize on page load
         checkPasswordStrength();
     </script>

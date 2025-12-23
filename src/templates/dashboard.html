@@ -452,8 +452,8 @@
             }
         }
 
-        function displayUserDetails(user) {
-            const container = document.getElementById('userDetailsContainer');
+       function displayUserDetails(user, containerId = 'userDetailsContainer') {
+            const container = document.getElementById(containerId);
             container.innerHTML = `
                 <div class="detail-row">
                     <span class="detail-label">Username:</span>
@@ -600,7 +600,7 @@
                 
                 if (data.success) {
                     searchResult.innerHTML = '';
-                    displayUserDetails(data.user);
+                    displayUserDetails(data.user, "searchResult");
                     document.getElementById('userDetailsContainer').innerHTML = document.getElementById('userDetailsContainer').innerHTML;
                 } else {
                     searchResult.innerHTML = `<div style="text-align: center; color: #c33; padding: 20px;">User not found</div>`;
