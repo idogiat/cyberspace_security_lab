@@ -1,8 +1,11 @@
+import threading
 from flask import Flask, render_template, request, jsonify, redirect, session, url_for
 from datetime import timedelta, datetime
 import json
 import sys
 import os
+
+import pyotp
 
 # Ensure src is on path so imports work when running from repo root
 sys.path.insert(0, os.path.dirname(__file__))
@@ -38,7 +41,26 @@ def register_page():
 def dashboard():
     if 'username' not in session:
         return redirect(url_for('login_page'))
+    # verify if user has passed totp if he required to do so
+    # prevent url hopping between dashboard and login
+    users = db.get_user(session['username'])
+    user_record = users[0] if users else None
+    totp_secret = user_record.totp if user_record and hasattr(user_record, 'totp') else ''
+    if totp_secret and not session.get('totp_verified'):
+                return redirect(url_for('totp_verify_page'))
     return render_template('dashboard.html', username=session['username'])
+
+@app.route('/totp-verify')
+def totp_verify_page():
+    if 'username' not in session:
+        return redirect(url_for('login_page'))
+    
+    users = db.get_user(session['username'])
+    user_record = users[0] if users else None
+    totp_secret = user_record.totp if user_record and hasattr(user_record, 'totp') else ''
+    if not totp_secret:
+        return redirect(url_for('dashboard'))
+    return render_template('login_totp.html', username=session['username'])
 
 @app.route('/api/register', methods=['POST'])
 def api_register():
@@ -47,6 +69,7 @@ def api_register():
         username = data.get('username', '').strip()
         password = data.get('password', '').strip()
         hash_mode = data.get('hash_mode', 'bcrypt')  # default to bcrypt
+        totp = data.get('use_totp', False)  # default to no totp
 
         if not username or len(username) < 3:
             return jsonify({'success': False, 'message': 'Username must be at least 3 characters'}), 400
@@ -58,17 +81,46 @@ def api_register():
         if db.user_exists(username):
             return jsonify({'success': False, 'message': 'Username already exists'}), 409
 
+        totp_secret = ''
+        if totp:
+            totp_secret = pyotp.random_base32()
         # Register user in database with hashing
         try:
-            db.register(username, password, hash_mode)
+            db.register(username, password, hash_mode, totp_secret)
         except Exception as e:
             # if DB raised IntegrityError it bubbles up - return conflict
             return jsonify({'success': False, 'message': str(e)}), 500
 
-        return jsonify({'success': True, 'message': 'Registration successful. Please login.', 'username': username}), 201
+      
+        update_json_file(username, totp_secret)
+
+        return jsonify({
+            'success': True, 
+            'message': 'Registration successful. Please login.', 
+            'username': username,
+            'totp_secret': totp_secret if totp else None
+            }), 201
 
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+
+def update_json_file(username, totp_secret):
+            json_path = os.path.join(os.path.dirname(__file__), 'users.json')
+            try:
+                if not os.path.exists(json_path):
+                    users_json = {"group_seed": 524392612, "users": []}
+                else:
+                    with open(json_path, 'r', encoding='utf-8') as f:
+                        users_json = json.load(f)
+                print(totp_secret)
+                users_json["users"].append({
+                    "username": username,
+                    "totp_secret": totp_secret
+                })
+                with open(json_path, 'w', encoding='utf-8') as f:
+                    json.dump(users_json, f, ensure_ascii=False, indent=4)
+            except Exception as e:
+                print(f"Failed to update users.json file: {e}")
 
 @app.route('/api/login', methods=['POST'])
 def api_login():
@@ -93,12 +145,76 @@ def api_login():
         # Login successful
         session['username'] = username
         session.permanent = True
+
+        # Ensure totp to be verified to prevent url hopping
+        session['totp_verified'] = False
+
+        # get user record from DB
+        users = db.get_user(username)
+        user_record = users[0]
+        totp_secret = user_record.totp
+        
+        # if user has a totp secret
+        if totp_secret != '':
+            db.log_login_attempt(username, 'requires totp', client_ip, user_agent)
+            return jsonify({
+                'success': True,
+                'message': 'TOTP required',
+                'username': username,
+                'redirect': '/totp-verify'
+            }), 200
+        
         db.log_login_attempt(username, 'success', client_ip, user_agent)
 
         return jsonify({'success': True, 'message': 'Login successful', 'username': username, 'redirect': '/dashboard'}), 200
 
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+
+
+
+@app.route('/api/verify-totp', methods=['POST'])
+def verify_totp():
+    try:
+        # verify user has passed the log in
+        if 'username' not in session:
+            return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        
+        # Get client info from log in
+        data = request.get_json()
+        totp_code = data.get('totp', '').strip()
+        username = session['username']
+        
+        # get user info from DB
+        users = db.get_user(username)
+        user_records = users[0]
+
+        # check if user has TOTP
+        if not user_records or not hasattr(user_records, 'totp'):
+            return jsonify({'success': False, 'message': 'User TOTP secret not found'}), 400
+        
+        # get the TOTP value
+        totp_secret = user_records.totp or ''
+        if not totp_secret:
+            return jsonify({'success': False, 'message': 'User does not have TOTP enabled'}), 400
+
+        # TOTP verification
+        totp_verifier = pyotp.TOTP(totp_secret)
+        if totp_verifier.verify(totp_code, valid_window=1):
+            session['totp_verified'] = True
+
+            # update login logs
+            client_ip = request.remote_addr
+            user_agent = request.headers.get('User-Agent', 'Unknown')
+            db.log_login_attempt(username, 'success', client_ip, user_agent)
+            
+            return jsonify({'success': True, 'message': 'TOTP verified! Redirecting to dashboard page'}), 200
+        
+        else:
+            return jsonify({'success': False, 'message': 'Invalid TOTP code. Please check and try again.'}), 401
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 
 @app.route('/api/logout', methods=['POST'])
 def api_logout():
@@ -137,9 +253,10 @@ def user_details(username):
                 'username': user_obj.username,
                 'hash_mode': user_obj.hash_mode,
                 'group_seed': user_obj.group_seed,
-                'salt': user_obj.salt if user_obj.salt else None,
+                'salt': user_obj.salt.decode() if isinstance(user_obj.salt, bytes) else user_obj.salt if user_obj.salt else None,
                 'metadata': user_obj.metadata,
-                'created_at': getattr(user_obj, 'created_at', None) or user_obj.metadata.get('created_at', None) if isinstance(user_obj.metadata, dict) else None
+                'created_at': getattr(user_obj, 'created_at', None) or user_obj.metadata.get('created_at', None) if isinstance(user_obj.metadata, dict) else None,
+                'totp': user_obj.totp
             }
         }), 200
     except Exception as e:
@@ -199,6 +316,7 @@ def statistics():
         }), 200
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+
 
 @app.errorhandler(404)
 def not_found(error):

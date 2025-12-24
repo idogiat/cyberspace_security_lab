@@ -20,6 +20,8 @@ class Line(NamedTuple):
     hash_mode: str
     group_seed: int
     metadata: str
+    created_at: str
+    totp: str
 
 class LogsInfo(NamedTuple):
     timestamp: str
@@ -61,7 +63,8 @@ class DB:
                         hash_mode TEXT,
                         group_seed INTEGER,
                         metadata TEXT,
-                        created_at TEXT
+                        created_at TEXT,
+                        totp TEXT
                     )
                 """)
                 self.connection.commit()
@@ -87,7 +90,7 @@ class DB:
             print(f"Error creating login logs table: {e}")
 
     # Creates a new user record in the users table
-    def register(self, username, password, hash_mode, PEPPER=None, metadata='{}'):    
+    def register(self, username, password, hash_mode, totp=False, PEPPER=None, metadata='{}'):  
         try:
             with self.connection:
                 salt = ''
@@ -134,8 +137,8 @@ class DB:
                         
                 created_at = datetime.datetime.now().isoformat()
                 self.connection.execute(
-                    'INSERT INTO users (username, password, salt, hash_mode, group_seed, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                    (username, hashed_password, salt, hash_mode, self.group_seed, metadata, created_at)
+                    'INSERT INTO users (username, password, salt, hash_mode, group_seed, metadata, created_at, totp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                    (username, hashed_password, salt, hash_mode, self.group_seed, metadata, created_at, totp)
                 )
                 self.connection.commit()
         except sqlite3.IntegrityError:
@@ -258,7 +261,7 @@ class DB:
         try:
             with self.connection:
                 fetchResults = self.connection.execute(
-                    'SELECT username, password, salt, hash_mode, group_seed, metadata FROM users WHERE username=?', 
+                    'SELECT username, password, salt, hash_mode, group_seed, metadata, created_at, totp FROM users WHERE username=?', 
                     (username,)
                 )
                 users_records = fetchResults.fetchall()
