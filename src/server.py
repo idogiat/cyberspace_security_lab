@@ -1,9 +1,10 @@
-import threading
 from flask import Flask, render_template, request, jsonify, redirect, session, url_for
 from datetime import timedelta, datetime
 import json
 import sys
 import os
+import time
+import logging
 
 import pyotp
 import qrcode
@@ -14,6 +15,28 @@ import base64
 sys.path.insert(0, os.path.dirname(__file__))
 
 from Database import DB
+
+# Set up login attempt logger
+login_logger = logging.getLogger('login_attempts')
+if not login_logger.handlers:
+    handler = logging.FileHandler('attempts.log', encoding='utf-8')
+    formatter = logging.Formatter('%(message)s')
+    handler.setFormatter(formatter)
+    login_logger.addHandler(handler)
+    login_logger.setLevel(logging.INFO)
+
+def log_login_attempt_json(username, group_seed, hash_mode, protection_flags, result, latency_ms):
+    """Log a login attempt with all required fields as JSON."""
+    log_data = {
+        'timestamp': datetime.now().isoformat(),
+        'username': username,
+        'group_seed': str(group_seed),
+        'hash_mode': hash_mode,
+        'protection_flags': protection_flags,
+        'result': result,
+        'latency_ms': str(latency_ms)
+    }
+    login_logger.info(json.dumps(log_data, ensure_ascii=False))
 
 app = Flask(__name__, template_folder='templates')
 app.secret_key = 'your-secret-key-change-in-production'
@@ -147,6 +170,7 @@ def update_json_file(username, totp_secret):
 
 @app.route('/api/login', methods=['POST'])
 def api_login():
+    login_start = time.time()
     try:
         data = request.get_json()
         username = data.get('username', '').strip()
@@ -157,11 +181,20 @@ def api_login():
         user_agent = request.headers.get('User-Agent', 'Unknown')
 
         if not username or not password:
+            latency_ms = int((time.time() - login_start) * 1000)
+            log_login_attempt_json(username or 'unknown', db.group_seed, '', '', 'failed', latency_ms)
             db.log_login_attempt(username or 'unknown', 'failed', client_ip, user_agent)
             return jsonify({'success': False, 'message': 'Username and password required'}), 400
 
+        # Get user record to extract hash_mode
+        users = db.get_user(username)
+        user_record = users[0] if users else None
+        hash_mode = user_record.hash_mode if user_record else ''
+
         # Verify login using database
         if not db.login(username, password):
+            latency_ms = int((time.time() - login_start) * 1000)
+            log_login_attempt_json(username, db.group_seed, hash_mode, '', 'failed', latency_ms)
             db.log_login_attempt(username, 'failed', client_ip, user_agent)
             return jsonify({'success': False, 'message': 'Invalid username or password'}), 401
 
@@ -170,13 +203,13 @@ def api_login():
         session.permanent = True
 
         # get user record from DB to determine if TOTP is required
-        users = db.get_user(username)
-        user_record = users[0] if users else None
         totp_secret = user_record.totp if user_record and hasattr(user_record, 'totp') else ''
 
         # If user has TOTP enabled, mark as not yet verified and request TOTP
         if totp_secret:
             session['totp_verified'] = False
+            latency_ms = int((time.time() - login_start) * 1000)
+            log_login_attempt_json(username, db.group_seed, hash_mode, 'totp_required', 'requires_totp', latency_ms)
             db.log_login_attempt(username, 'requires totp', client_ip, user_agent)
             return jsonify({
                 'success': True,
@@ -187,11 +220,15 @@ def api_login():
 
         # No TOTP configured — mark verified and finish login
         session['totp_verified'] = True
+        latency_ms = int((time.time() - login_start) * 1000)
+        log_login_attempt_json(username, db.group_seed, hash_mode, '', 'success', latency_ms)
         db.log_login_attempt(username, 'success', client_ip, user_agent)
 
         return jsonify({'success': True, 'message': 'Login successful', 'username': username, 'redirect': '/dashboard'}), 200
 
     except Exception as e:
+        latency_ms = int((time.time() - login_start) * 1000)
+        log_login_attempt_json('', db.group_seed, '', '', f'error: {str(e)[:50]}', latency_ms)
         return jsonify({'success': False, 'message': str(e)}), 500
 
 

@@ -23,15 +23,6 @@ class Line(NamedTuple):
     created_at: str
     totp: str
 
-class LogsInfo(NamedTuple):
-    timestamp: str
-    usernmae: str
-    groud_seed: str
-    hash_mode: str
-    protection_flags: str
-    result: str
-    latency_ms: str
-
 class LoginLog(NamedTuple):
     id: int
     username: str
@@ -192,14 +183,6 @@ class DB:
             print(f"Error retrieving login logs: {e}")
             return []
 
-    # log the login attempt to attempts.log
-    def log_attempt(self, logs_info: LogsInfo, log_file="attempts.log"):
-        try:
-            with open(log_file, "a") as f: 
-                f.write(json.dumps(logs_info._asdict()) + "\n")
-        except Exception as e:
-            print(f"Error logging attempt to file: {e}")
- 
     # login method
     def login(self, username, password_input, PEPPER=None): 
         """Authenticate user and return True if successful"""
