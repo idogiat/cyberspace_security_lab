@@ -6,6 +6,9 @@ import sys
 import os
 
 import pyotp
+import qrcode
+from io import BytesIO
+import base64
 
 # Ensure src is on path so imports work when running from repo root
 sys.path.insert(0, os.path.dirname(__file__))
@@ -84,6 +87,24 @@ def api_register():
         totp_secret = ''
         if totp:
             totp_secret = pyotp.random_base32()
+
+        # If TOTP requested, create otpauth URI and QR code to return to client
+        qr_data_uri = None
+        otpauth_uri = None
+        if totp_secret:
+            try:
+                totp_obj = pyotp.TOTP(totp_secret)
+                otpauth_uri = totp_obj.provisioning_uri(name=username, issuer_name="Cyberspace Security Lab")
+                # generate QR image and encode as data URI
+                qr_img = qrcode.make(otpauth_uri)
+                buf = BytesIO()
+                qr_img.save(buf, format='PNG')
+                buf.seek(0)
+                qr_b64 = base64.b64encode(buf.read()).decode('ascii')
+                qr_data_uri = f"data:image/png;base64,{qr_b64}"
+            except Exception as e:
+                print(f"Failed to generate QR code: {e}")
+
         # Register user in database with hashing
         try:
             db.register(username, password, hash_mode, totp_secret)
@@ -95,11 +116,13 @@ def api_register():
         update_json_file(username, totp_secret)
 
         return jsonify({
-            'success': True, 
-            'message': 'Registration successful. Please login.', 
+            'success': True,
+            'message': 'Registration successful. Please login.',
             'username': username,
-            'totp_secret': totp_secret if totp else None
-            }), 201
+            'totp_secret': totp_secret if totp else None,
+            'otpauth_uri': otpauth_uri,
+            'qr_code': qr_data_uri
+        }), 201
 
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -146,16 +169,14 @@ def api_login():
         session['username'] = username
         session.permanent = True
 
-        # Ensure totp to be verified to prevent url hopping
-        session['totp_verified'] = False
-
-        # get user record from DB
+        # get user record from DB to determine if TOTP is required
         users = db.get_user(username)
-        user_record = users[0]
-        totp_secret = user_record.totp
-        
-        # if user has a totp secret
-        if totp_secret != '':
+        user_record = users[0] if users else None
+        totp_secret = user_record.totp if user_record and hasattr(user_record, 'totp') else ''
+
+        # If user has TOTP enabled, mark as not yet verified and request TOTP
+        if totp_secret:
+            session['totp_verified'] = False
             db.log_login_attempt(username, 'requires totp', client_ip, user_agent)
             return jsonify({
                 'success': True,
@@ -163,7 +184,9 @@ def api_login():
                 'username': username,
                 'redirect': '/totp-verify'
             }), 200
-        
+
+        # No TOTP configured — mark verified and finish login
+        session['totp_verified'] = True
         db.log_login_attempt(username, 'success', client_ip, user_agent)
 
         return jsonify({'success': True, 'message': 'Login successful', 'username': username, 'redirect': '/dashboard'}), 200
