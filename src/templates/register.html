@@ -361,7 +361,7 @@
 
                 if (data.success) {
                     if (data.totp_secret) {
-                        showTotpSecret(data.totp_secret);
+                        showTotpModal(data.totp_secret, data.qr_code, data.otpauth_uri);
                     } else {
                         showSuccess(data.message);
                         form.reset();
@@ -380,8 +380,8 @@
             }
         });
 
-        function showTotpSecret(secret) {
-            // creates a pop up window for TOTP
+        function showTotpModal(secret, qrDataUri, otpauthUri) {
+            // creates a pop up window for TOTP with QR if available
             const modal = document.createElement('div');
             modal.style.position = 'fixed';
             modal.style.left = 0;
@@ -392,13 +392,21 @@
             modal.style.display = 'flex';
             modal.style.alignItems = 'center';
             modal.style.justifyContent = 'center';
+
+            const qrHtml = qrDataUri ? `<div style="margin:12px 0;"><img src="${qrDataUri}" alt="TOTP QR" style="max-width:220px;display:block;margin:0 auto;border-radius:6px;"/></div>` : '';
+            const otpauthLink = otpauthUri ? `<p style="font-size:12px;color:#666;word-break:break-all;margin-top:8px;"><a href="${otpauthUri}">Provisioning URI</a></p>` : '';
+
             modal.innerHTML = `
-                <div style="background:white;padding:25px 20px;border-radius:10px;max-width:350px;text-align:center;">
+                <div style="background:white;padding:20px;border-radius:10px;max-width:420px;text-align:center;">
                     <h2>Two-Factor Authentication</h2>
-                    <p style="margin:16px 0;">Your TOTP secret:<br>
-                    <strong style="word-break:break-all;font-size:1.2em;color:#667eea;">${secret}</strong></p>
-                    <p style="font-size:13px;color:#555;">Save this code in your authenticator app.<br>It will not appear again!</p>
-                    <button id="okTotpBtn" style="margin-top:18px;padding:8px 30px;border-radius:4px;background:#667eea;color:white;border:none;font-weight:bold;">OK</button>
+                    ${qrHtml}
+                    <p style="margin:10px 0;">Your TOTP secret:<br>
+                    <strong style="word-break:break-all;font-size:1.1em;color:#667eea;">${secret}</strong></p>
+                    <p style="font-size:13px;color:#555;">Scan the QR code with your authenticator app or copy the secret above.<br>It will not appear again!</p>
+                    ${otpauthLink}
+                    <div style="display:flex;gap:8px;justify-content:center;margin-top:14px;">
+                      <button id="okTotpBtn" style="padding:8px 20px;border-radius:4px;background:#667eea;color:white;border:none;font-weight:bold;">OK</button>
+                    </div>
                 </div>
             `;
             document.body.appendChild(modal);
