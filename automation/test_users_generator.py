@@ -26,7 +26,7 @@ def gen_username(i=None, prefix='loaduser', randomize=False, length=6):
         return f"{prefix}{i}"
 
 
-def main():
+def generate_users():
     parser = argparse.ArgumentParser()
     parser.add_argument("--count", type=int, default=10, help="Number of test users to create")
     parser.add_argument("--host", type=str, default="http://localhost:5000", help="Server base URL")
@@ -84,4 +84,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    generate_users()
