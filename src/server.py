@@ -121,7 +121,6 @@ def api_register():
         totp = data.get('use_totp', False)  # default to no totp
         use_pepper = data.get('use_pepper', False)
 
-
         if not username or len(username) < 3:
             return jsonify({'success': False, 'message': 'Username must be at least 3 characters'}), 400
 

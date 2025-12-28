@@ -90,7 +90,7 @@ class DB:
             with self.connection:
                 salt = ''
                 hashed_password = ''
-              
+
                 # Match hash modes and compute appropriate hash
                 match hash_mode:
                     case "Argon2":
@@ -126,7 +126,7 @@ class DB:
 
                         # hexdigest to make the password more readable (Hex format)
                         hashed_password = hashlib.sha256(password.encode()).hexdigest()
-                        
+
                 created_at = datetime.datetime.now().isoformat()
                 self.connection.execute(
                     'INSERT INTO users (username, password, salt, hash_mode, group_seed, metadata, created_at, totp, pepper) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
