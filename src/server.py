@@ -199,6 +199,14 @@ def api_login():
         username = data.get('username', '').strip()
         password = data.get('password', '').strip()
 
+        # Rate-Limit validation
+        user_info = user_login_attempts.get(username, {})
+        locked_until = user_info.get('locked_until',0)
+        seconds_left = int(locked_until - time.time())
+        if seconds_left > 0:
+            return jsonify({'success': False, 'message': f'This account is locked for {seconds_left} seconds'}), 429
+            
+        
         # Get client info for logging
         now = time.time()
         latency_ms = int((now - login_start) * 1000)
@@ -285,6 +293,8 @@ def api_login():
         # Login successful
         session['username'] = username
         session.permanent = True
+        # initialize for rate-limit
+        user_login_attempts[username] = {'failed': 0, 'locked_until': 0}
 
         # Login successful - reset state for lockout and rate limit
         user_login_attempts[username] = {
