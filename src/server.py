@@ -15,6 +15,17 @@ import base64
 sys.path.insert(0, os.path.dirname(__file__))
 
 
+ATTEMPTS_LIMIT = 5 # Max tokens per username
+LOCK_TIME_SEC = 120
+
+# user_login_attempts = {
+#     "<username>": {
+#         "failed": <int>,        # consecutive number of failed attemps
+#         "locked_until": <float> # timestamp
+#     },
+#     ...
+# }
+user_login_attempts = {}
 
 from Database import DB
 
@@ -182,6 +193,14 @@ def api_login():
         username = data.get('username', '').strip()
         password = data.get('password', '').strip()
 
+        # Rate-Limit validation
+        user_info = user_login_attempts.get(username, {})
+        locked_until = user_info.get('locked_until',0)
+        seconds_left = int(locked_until - time.time())
+        if seconds_left > 0:
+            return jsonify({'success': False, 'message': f'This account is locked for {seconds_left} seconds'}), 429
+            
+        
         # Get client info for logging
         client_ip = request.remote_addr
         user_agent = request.headers.get('User-Agent', 'Unknown')
@@ -199,6 +218,15 @@ def api_login():
 
         # Verify login using database
         if not db.login(username, password):
+            now = time.time()
+            record = user_login_attempts.get(username, {'failed': 0, 'locked_until': 0})
+
+            if now >= record.get('locked_until', 0):
+                record['failed'] += 1
+                if record['failed'] >= ATTEMPTS_LIMIT:
+                    record['locked_until'] = now + LOCK_TIME_SEC
+                    record['failed'] = 0
+                user_login_attempts[username] = record
             latency_ms = int((time.time() - login_start) * 1000)
             log_login_attempt_json(username, db.group_seed, hash_mode, '', 'failed', latency_ms)
             db.log_login_attempt(username, 'failed', client_ip, user_agent)
@@ -207,6 +235,8 @@ def api_login():
         # Login successful
         session['username'] = username
         session.permanent = True
+        # initialize for rate-limit
+        user_login_attempts[username] = {'failed': 0, 'locked_until': 0}
 
         # get user record from DB to determine if TOTP is required
         totp_secret = user_record.totp if user_record and hasattr(user_record, 'totp') else ''
