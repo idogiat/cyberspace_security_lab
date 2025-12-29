@@ -1,29 +1,5 @@
 {
     "group_seed": 524392612,
     "users": [
-        {
-            "username": "boby",
-            "totp_secret": "42GPCPM5LHSAXYO4YQ3QDASRXU4QUTOQ"
-        },
-        {
-            "username": "boby1",
-            "totp_secret": "F7DPPUBFFA7Q7SA5ONYSSTTWRTALNCQL"
-        },
-        {
-            "username": "boby2",
-            "totp_secret": "W7EZ4PI4Q5D7EJETNQRFWTASPHKG2BTS"
-        },
-        {
-            "username": "boby3",
-            "totp_secret": "TGHVP6A2VASDI3WDD7NUKS2JAVDWAHL2"
-        },
-        {
-            "username": "John",
-            "totp_secret": "UVQMBLTCTCACSBR64KJIZVHIKGNMJSYE"
-        },
-        {
-            "username": "Dave",
-            "totp_secret": "HINWZUH4XOBSXEZOSTN5KJ3FE5WTYFBY"
-        }
     ]
 }

@@ -453,6 +453,9 @@
         }
 
        function displayUserDetails(user, containerId = 'userDetailsContainer') {
+            
+            console.log(user.pepper);
+            console.log(typeof user.totp);
             const container = document.getElementById(containerId);
             container.innerHTML = `
                 <div class="detail-row">
@@ -478,6 +481,14 @@
                 <div class="detail-row">
                     <span class="detail-label">Metadata:</span>
                     <span class="detail-value">${user.metadata || 'None'}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">TOTP:</span>
+                    <span class="detail-value">${(user.totp == '' ? false : true)}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">PEPPER:</span>
+                    <span class="detail-value">${(user.pepper == 1 ? true : false)}</span>
                 </div>
             `;
         }
