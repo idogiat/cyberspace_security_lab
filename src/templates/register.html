@@ -230,8 +230,16 @@
                     <option value="bcrypt">bcrypt (Recommended)</option>
                     <option value="Argon2">Argon2</option>
                     <option value="SHA-256 + SALT">SHA-256 + SALT</option>
-                    <option value="SHA-256 + SALT + PEPPER">SHA-256 + SALT + PEPPER</option>
+                    <!-- <option value="SHA-256 + SALT + PEPPER">SHA-256 + SALT + PEPPER</option> -->
                 </select>
+            </div>
+            
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="usePepper" name="usePepper">
+                    Use PEPPER (extra security)
+                </label>
             </div>
 
             <div class="form-group">
@@ -321,7 +329,10 @@
             const confirmPassword = confirmPasswordInput.value;
             const hashMode = document.getElementById('hashMode').value;
             const useTotp = document.getElementById('useTotp').checked;
+            const usePepper = document.getElementById('usePepper').checked;
 
+
+            console.log(usePepper);
             // Validate inputs
             if (username.length < 3) {
                 showError('Username must be at least 3 characters');
@@ -355,7 +366,7 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                body: JSON.stringify({ username, password, hash_mode: hashMode, use_totp: useTotp })});
+                body: JSON.stringify({ username, password, hash_mode: hashMode, use_totp: useTotp, use_pepper: usePepper })});
 
                 const data = await response.json();
 

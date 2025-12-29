@@ -12,6 +12,8 @@ from typing import NamedTuple
 
 GROUP_SEED = 524392612  # to be corrected
 
+# convert pepper to bytes to support encrypt functions in the code
+PEPPER = os.environ.get("PASSWORD_PEPPER")
 
 class Line(NamedTuple):
     username: str
@@ -22,6 +24,7 @@ class Line(NamedTuple):
     metadata: str
     created_at: str
     totp: str
+    pepper: int # 1 for true, 0 for false
 
 class LoginLog(NamedTuple):
     id: int
@@ -55,7 +58,8 @@ class DB:
                         group_seed INTEGER,
                         metadata TEXT,
                         created_at TEXT,
-                        totp TEXT
+                        totp TEXT,
+                        pepper INTEGER                                        
                     )
                 """)
                 self.connection.commit()
@@ -81,55 +85,58 @@ class DB:
             print(f"Error creating login logs table: {e}")
 
     # Creates a new user record in the users table
-    def register(self, username, password, hash_mode, totp=False, PEPPER=None, metadata='{}'):  
+    def register(self, username, password, hash_mode, totp=False, pepper_flag=False, metadata='{}'):  
         try:
             with self.connection:
                 salt = ''
                 hashed_password = ''
-                
+              
                 # Match hash modes and compute appropriate hash
                 match hash_mode:
-                    case "TOTP":
-                        # TO DO
-                        pass
                     case "Argon2":
                         # compute Argon2 encrypt + Salt 
-                        ph = PasswordHasher()
+                        ph = PasswordHasher(
+                            time_cost=1,
+                            memory_cost=65536,  # 64 MB
+                            parallelism=1)
                         
                         # if PEPPER is added to the hash
-                        if PEPPER:
+                        if pepper_flag:
                             password = password + PEPPER
                         
                         hashed_password = ph.hash(password)
                     case "bcrypt":
-                        salt = bcrypt.gensalt()
-                        if PEPPER:
-                            password = password + PEPPER
-                        # bcrypt hash works with bytes (hence the encode)
-                        # decode to make the password more readable (not affecting security)
-                        hashed_password = bcrypt.hashpw(password.encode(), salt).decode()
+                        # In bcrypt the PEPPER is added to the password instead of to the salt
+                        salt = bcrypt.gensalt(rounds=12)
+                        if pepper_flag:
+                            # bcrypt hash works with bytes (hence the encode)
+                            hashed_password = bcrypt.hashpw((password + PEPPER).encode(), salt).decode()
+                        else:
+                            # decode to make the password more readable (not affecting security)
+                            hashed_password = bcrypt.hashpw(password.encode(), salt).decode()
 
                     case "SHA-256 + SALT":
                         # generate a random salt value
                         salt = os.urandom(16).hex()
                         password = password + salt
+                        if pepper_flag:
+                            password = password + PEPPER
+
                         # hexdigest to make the password more readable (Hex format)
                         hashed_password = hashlib.sha256(password.encode()).hexdigest()
-                    case "SHA-256 + SALT + PEPPER":
-                        if PEPPER is None:
-                            print("Requested SHA-256 + SALT + PEPPER mode but PEPPER was not provided")
-                            raise ValueError("PEPPER is required for this hash mode")
-                        else:
-                            # generate a random salt value
-                            salt = os.urandom(16).hex()
-                            password = password + salt
-                            # hexdigest to make the password more readable (Hex format)
-                            hashed_password = hashlib.sha256(password.encode()).hexdigest()
+                    
+                    
+                    # case "SHA-256 + SALT + PEPPER":
+                    #         # generate a random salt value
+                    #         salt = os.urandom(16).hex()
+                    #         password = password + salt + PEPPER
+                    #         # hexdigest to make the password more readable (Hex format)
+                    #         hashed_password = hashlib.sha256(password.encode()).hexdigest()
                         
                 created_at = datetime.datetime.now().isoformat()
                 self.connection.execute(
-                    'INSERT INTO users (username, password, salt, hash_mode, group_seed, metadata, created_at, totp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                    (username, hashed_password, salt, hash_mode, self.group_seed, metadata, created_at, totp)
+                    'INSERT INTO users (username, password, salt, hash_mode, group_seed, metadata, created_at, totp, pepper) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    (username, hashed_password, salt, hash_mode, self.group_seed, metadata, created_at, totp, int(pepper_flag))
                 )
                 self.connection.commit()
         except sqlite3.IntegrityError:
@@ -184,10 +191,11 @@ class DB:
             return []
 
     # login method
-    def login(self, username, password_input, PEPPER=None): 
+    def login(self, username, password_input): 
         """Authenticate user and return True if successful"""
         try:
             users = self.get_user(username)
+            
             
             # no user with the input username
             if not users:
@@ -195,10 +203,14 @@ class DB:
             
             # check each user with the username=<username>
             for user in users:
+
                 match user.hash_mode:
                     case "Argon2":
-                        ph = PasswordHasher()
-                        if PEPPER:
+                        ph = PasswordHasher(
+                            time_cost=1,
+                            memory_cost=65536,  # 64 MB
+                            parallelism=1)
+                        if user.pepper:
                             password_input = password_input + PEPPER
                         try:
                             # ph.verify throws exception if verification failed
@@ -208,30 +220,32 @@ class DB:
                             continue
                         
                     case "bcrypt":
-                        if PEPPER:
+                        if user.pepper:
                             password_input = password_input + PEPPER
                         result = bcrypt.checkpw(password_input.encode(), user.password.encode())
                         if result:
                             return True
 
                     case "SHA-256 + SALT":
+
                         password_input = password_input + user.salt
+                        if user.pepper:
+                            password_input = password_input + PEPPER
                         candidate_hash = hashlib.sha256(password_input.encode()).hexdigest()
-
                         if candidate_hash == user.password:
                             return True
 
-                    case "SHA-256 + SALT + PEPPER":
-                        if not PEPPER:
-                            print("Requested SHA-256 + SALT + PEPPER mode but PEPPER was not provided")
-                        password_input = password_input + user.salt + PEPPER
-                        candidate_hash = hashlib.sha256(password_input.encode()).hexdigest()
+                    # case "SHA-256 + SALT + PEPPER":
+                    #     if not PEPPER:
+                    #         print("Requested SHA-256 + SALT + PEPPER mode but PEPPER was not provided")
+                    #     password_input = password_input + user.salt + PEPPER
+                    #     candidate_hash = hashlib.sha256(password_input.encode()).hexdigest()
 
-                        if candidate_hash == user.password:
-                            return True
-                    case "TOTP":
-                        # TO DO
-                        pass
+                    #     if candidate_hash == user.password:
+                    #         return True
+                    # case "TOTP":
+                    #     # TO DO
+                    #     pass
                 
                 return False
         except Exception as e:
@@ -244,7 +258,7 @@ class DB:
         try:
             with self.connection:
                 fetchResults = self.connection.execute(
-                    'SELECT username, password, salt, hash_mode, group_seed, metadata, created_at, totp FROM users WHERE username=?', 
+                    'SELECT username, password, salt, hash_mode, group_seed, metadata, created_at, totp, pepper FROM users WHERE username=?', 
                     (username,)
                 )
                 users_records = fetchResults.fetchall()

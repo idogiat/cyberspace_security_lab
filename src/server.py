@@ -14,6 +14,8 @@ import base64
 # Ensure src is on path so imports work when running from repo root
 sys.path.insert(0, os.path.dirname(__file__))
 
+
+
 from Database import DB
 
 # Set up login attempt logger
@@ -96,6 +98,8 @@ def api_register():
         password = data.get('password', '').strip()
         hash_mode = data.get('hash_mode', 'bcrypt')  # default to bcrypt
         totp = data.get('use_totp', False)  # default to no totp
+        use_pepper = data.get('use_pepper', False)
+
 
         if not username or len(username) < 3:
             return jsonify({'success': False, 'message': 'Username must be at least 3 characters'}), 400
@@ -130,7 +134,7 @@ def api_register():
 
         # Register user in database with hashing
         try:
-            db.register(username, password, hash_mode, totp_secret)
+            db.register(username, password, hash_mode, totp_secret, use_pepper)
         except Exception as e:
             # if DB raised IntegrityError it bubbles up - return conflict
             return jsonify({'success': False, 'message': str(e)}), 500
@@ -158,7 +162,6 @@ def update_json_file(username, totp_secret):
                 else:
                     with open(json_path, 'r', encoding='utf-8') as f:
                         users_json = json.load(f)
-                print(totp_secret)
                 users_json["users"].append({
                     "username": username,
                     "totp_secret": totp_secret
@@ -316,7 +319,8 @@ def user_details(username):
                 'salt': user_obj.salt.decode() if isinstance(user_obj.salt, bytes) else user_obj.salt if user_obj.salt else None,
                 'metadata': user_obj.metadata,
                 'created_at': getattr(user_obj, 'created_at', None) or user_obj.metadata.get('created_at', None) if isinstance(user_obj.metadata, dict) else None,
-                'totp': user_obj.totp
+                'totp': user_obj.totp,
+                'pepper': user_obj.pepper
             }
         }), 200
     except Exception as e:
