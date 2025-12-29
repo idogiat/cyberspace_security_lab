@@ -390,8 +390,12 @@ def not_found(error):
 def server_error(error):
     return jsonify({'error': 'Server error'}), 500
 
-if __name__ == '__main__':
+
+def create_app():
     print("Starting Flask server on http://0.0.0.0:5000")
     print("Open http://localhost:5000 in your browser")
     print("Database initialized at users.db")
     app.run(host='0.0.0.0', port=5000, debug=True)
+
+if __name__ == '__main__':
+    create_app()

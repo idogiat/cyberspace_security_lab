@@ -2,3 +2,4 @@ Flask>=3.1.2
 pyotp>=2.9.0
 qrcode>=8.2
 argon2-cffi>=25.1.0
+requests>=2.31.0
