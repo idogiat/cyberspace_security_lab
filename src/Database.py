@@ -91,14 +91,14 @@ class DB:
                 salt = ''
                 hashed_password = ''
               
-                print("in register db")
-                print(pepper_flag)
-                print(PEPPER)
                 # Match hash modes and compute appropriate hash
                 match hash_mode:
                     case "Argon2":
                         # compute Argon2 encrypt + Salt 
-                        ph = PasswordHasher()
+                        ph = PasswordHasher(
+                            time_cost=1,
+                            memory_cost=65536,  # 64 MB
+                            parallelism=1)
                         
                         # if PEPPER is added to the hash
                         if pepper_flag:
@@ -107,7 +107,7 @@ class DB:
                         hashed_password = ph.hash(password)
                     case "bcrypt":
                         # In bcrypt the PEPPER is added to the password instead of to the salt
-                        salt = bcrypt.gensalt()
+                        salt = bcrypt.gensalt(rounds=12)
                         if pepper_flag:
                             # bcrypt hash works with bytes (hence the encode)
                             hashed_password = bcrypt.hashpw((password + PEPPER).encode(), salt).decode()
@@ -116,8 +116,6 @@ class DB:
                             hashed_password = bcrypt.hashpw(password.encode(), salt).decode()
 
                     case "SHA-256 + SALT":
-                        print(pepper_flag)
-                        print(PEPPER)
                         # generate a random salt value
                         salt = os.urandom(16).hex()
                         password = password + salt
@@ -208,7 +206,10 @@ class DB:
 
                 match user.hash_mode:
                     case "Argon2":
-                        ph = PasswordHasher()
+                        ph = PasswordHasher(
+                            time_cost=1,
+                            memory_cost=65536,  # 64 MB
+                            parallelism=1)
                         if user.pepper:
                             password_input = password_input + PEPPER
                         try:
@@ -231,8 +232,6 @@ class DB:
                         if user.pepper:
                             password_input = password_input + PEPPER
                         candidate_hash = hashlib.sha256(password_input.encode()).hexdigest()
-                        print(candidate_hash)
-                        print(user.password)
                         if candidate_hash == user.password:
                             return True
 

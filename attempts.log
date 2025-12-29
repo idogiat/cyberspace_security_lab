@@ -32,3 +32,5 @@
 {"timestamp": "2025-12-28T12:16:38.090053", "username": "John", "group_seed": "524392612", "hash_mode": "bcrypt", "protection_flags": "", "result": "success", "latency_ms": "264"}
 {"timestamp": "2025-12-28T12:16:48.886177", "username": "John30", "group_seed": "524392612", "hash_mode": "bcrypt", "protection_flags": "", "result": "failed", "latency_ms": "296"}
 {"timestamp": "2025-12-28T12:17:25.368301", "username": "John50", "group_seed": "524392612", "hash_mode": "bcrypt", "protection_flags": "", "result": "success", "latency_ms": "269"}
+{"timestamp": "2025-12-29T17:36:52.505188", "username": "Dave25", "group_seed": "524392612", "hash_mode": "bcrypt", "protection_flags": "", "result": "success", "latency_ms": "253"}
+{"timestamp": "2025-12-29T17:37:25.006303", "username": "Dave26", "group_seed": "524392612", "hash_mode": "Argon2", "protection_flags": "", "result": "success", "latency_ms": "80"}

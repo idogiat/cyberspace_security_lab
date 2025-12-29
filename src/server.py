@@ -100,8 +100,6 @@ def api_register():
         totp = data.get('use_totp', False)  # default to no totp
         use_pepper = data.get('use_pepper', False)
 
-        print("in server.py")
-        print(use_pepper)
 
         if not username or len(username) < 3:
             return jsonify({'success': False, 'message': 'Username must be at least 3 characters'}), 400
@@ -164,7 +162,6 @@ def update_json_file(username, totp_secret):
                 else:
                     with open(json_path, 'r', encoding='utf-8') as f:
                         users_json = json.load(f)
-                print(totp_secret)
                 users_json["users"].append({
                     "username": username,
                     "totp_secret": totp_secret
