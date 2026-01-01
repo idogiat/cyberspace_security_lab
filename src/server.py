@@ -121,8 +121,6 @@ def api_register():
         totp = data.get('use_totp', False)  # default to no totp
         use_pepper = data.get('use_pepper', False)
 
-        print("in server.py")
-        print(use_pepper)
 
         if not username or len(username) < 3:
             return jsonify({'success': False, 'message': 'Username must be at least 3 characters'}), 400
@@ -185,7 +183,6 @@ def update_json_file(username, totp_secret):
                 else:
                     with open(json_path, 'r', encoding='utf-8') as f:
                         users_json = json.load(f)
-                print(totp_secret)
                 users_json["users"].append({
                     "username": username,
                     "totp_secret": totp_secret
@@ -248,6 +245,11 @@ def api_login():
             db.log_login_attempt(username, 'rate limit lockout', client_ip, user_agent)
             return jsonify({'success': False, 'message': f'This account is locked for {seconds_left} seconds'}), 429
             
+
+        # Get user record to extract hash_mode
+        users = db.get_user(username)
+        user_record = users[0] if users else None
+        hash_mode = user_record.hash_mode if user_record else ''
 
         # Verify login using database
         if not db.login(username, password):
@@ -478,8 +480,12 @@ def not_found(error):
 def server_error(error):
     return jsonify({'error': 'Server error'}), 500
 
-if __name__ == '__main__':
+
+def create_app():
     print("Starting Flask server on http://0.0.0.0:5000")
     print("Open http://localhost:5000 in your browser")
     print("Database initialized at users.db")
     app.run(host='0.0.0.0', port=5000, debug=True)
+
+if __name__ == '__main__':
+    create_app()
