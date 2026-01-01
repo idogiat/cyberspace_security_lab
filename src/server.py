@@ -199,14 +199,6 @@ def api_login():
         username = data.get('username', '').strip()
         password = data.get('password', '').strip()
 
-        # Rate-Limit validation
-        user_info = user_login_attempts.get(username, {})
-        locked_until = user_info.get('locked_until',0)
-        seconds_left = int(locked_until - time.time())
-        if seconds_left > 0:
-            return jsonify({'success': False, 'message': f'This account is locked for {seconds_left} seconds'}), 429
-            
-        
         # Get client info for logging
         now = time.time()
         latency_ms = int((now - login_start) * 1000)
@@ -253,10 +245,27 @@ def api_login():
             return jsonify({'success': False, 'message': f'This account is locked for {seconds_left} seconds'}), 429
             
 
-        # Get user record to extract hash_mode
-        users = db.get_user(username)
-        user_record = users[0] if users else None
-        hash_mode = user_record.hash_mode if user_record else ''
+        user_info = user_login_attempts.get(username, {
+            'failed': 0,
+            'locked_until': 0,
+            'locked_forever': False,
+            'rate_limit_failed': 0,
+        })
+
+        # User Locked forever check
+        if user_info.get('locked_forever', False):
+            log_login_attempt_json(username, db.group_seed, '', 'lockout', 'permanent lockout', latency_ms)
+            db.log_login_attempt(username, 'permanent lockout', client_ip, user_agent)
+            return jsonify({'success': False, 'message': 'This Account is permanently locked. Please contact admin.'}), 423
+
+        # Rate-Limit validation
+        locked_until = user_info.get('locked_until',0)
+        seconds_left = int(locked_until - time.time())
+        if seconds_left > 0:
+            log_login_attempt_json(username, db.group_seed, '', 'rate-limit', 'rate limit lockout', latency_ms)
+            db.log_login_attempt(username, 'rate limit lockout', client_ip, user_agent)
+            return jsonify({'success': False, 'message': f'This account is locked for {seconds_left} seconds'}), 429
+            
 
         # Verify login using database
         if not db.login(username, password):
@@ -293,8 +302,15 @@ def api_login():
         # Login successful
         session['username'] = username
         session.permanent = True
-        # initialize for rate-limit
-        user_login_attempts[username] = {'failed': 0, 'locked_until': 0}
+
+        # Login successful - reset state for lockout and rate limit
+        user_login_attempts[username] = {
+            'failed': 0,
+            'locked_until': 0,
+            'locked_forever': False,
+            'rate_limit_failed': 0,
+
+        }
 
         # Login successful - reset state for lockout and rate limit
         user_login_attempts[username] = {
