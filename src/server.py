@@ -15,8 +15,18 @@ import base64
 sys.path.insert(0, os.path.dirname(__file__))
 
 
-ATTEMPTS_LIMIT = 5 # Max tokens per username
-LOCK_TIME_SEC = 120
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), './config.json')
+with open(CONFIG_PATH, 'r') as f:
+    CONFIG = json.load(f)
+
+# make sure that LOCKOUT_THRESHOLD > RATE_LIMIT_ATTEMPTS
+LOCKOUT_THRESHOLD = CONFIG.get('LOCKOUT_THRESHOLD', 5)
+RATE_LIMIT_ATTEMPTS = CONFIG.get('RATE_LIMIT_ATTEMPTS', 3)
+RATE_LIMIT_LOCK_SEC = CONFIG.get('RATE_LIMIT_LOCK_SEC', 120)
+
+
+# ATTEMPTS_LIMIT = 5 # Max tokens per username
+# LOCK_TIME_SEC = 120
 
 # user_login_attempts = {
 #     "<username>": {
@@ -193,40 +203,79 @@ def api_login():
         username = data.get('username', '').strip()
         password = data.get('password', '').strip()
 
-        # Rate-Limit validation
-        user_info = user_login_attempts.get(username, {})
-        locked_until = user_info.get('locked_until',0)
-        seconds_left = int(locked_until - time.time())
-        if seconds_left > 0:
-            return jsonify({'success': False, 'message': f'This account is locked for {seconds_left} seconds'}), 429
-            
-        
         # Get client info for logging
+        now = time.time()
+        latency_ms = int((now - login_start) * 1000)
         client_ip = request.remote_addr
         user_agent = request.headers.get('User-Agent', 'Unknown')
-
+        
+        # Get user record to extract hash_mode
+        users = db.get_user(username)
+        user_exists = bool(users)
+        user_record = users[0] if users else None
+        hash_mode = user_record.hash_mode if user_record else ''
+        
         if not username or not password:
             latency_ms = int((time.time() - login_start) * 1000)
             log_login_attempt_json(username or 'unknown', db.group_seed, '', '', 'failed', latency_ms)
             db.log_login_attempt(username or 'unknown', 'failed', client_ip, user_agent)
             return jsonify({'success': False, 'message': 'Username and password required'}), 400
+        
+        # this check prevents locking a username that does not exist
+        if not user_exists:
+            log_login_attempt_json(username, db.group_seed, '', '', 'failed', latency_ms)
+            db.log_login_attempt(username, 'failed', client_ip, user_agent)
+            return jsonify({'success': False, 'message': 'Invalid username or password'}), 401
 
-        # Get user record to extract hash_mode
-        users = db.get_user(username)
-        user_record = users[0] if users else None
-        hash_mode = user_record.hash_mode if user_record else ''
+        user_info = user_login_attempts.get(username, {
+            'failed': 0,
+            'locked_until': 0,
+            'locked_forever': False,
+            'rate_limit_failed': 0,
+        })
+
+        # User Locked forever check
+        if user_info.get('locked_forever', False):
+            log_login_attempt_json(username, db.group_seed, '', 'lockout', 'permanent lockout', latency_ms)
+            db.log_login_attempt(username, 'permanent lockout', client_ip, user_agent)
+            return jsonify({'success': False, 'message': 'This Account is permanently locked. Please contact admin.'}), 423
+
+        # Rate-Limit validation
+        locked_until = user_info.get('locked_until',0)
+        seconds_left = int(locked_until - time.time())
+        if seconds_left > 0:
+            log_login_attempt_json(username, db.group_seed, '', 'rate-limit', 'rate limit lockout', latency_ms)
+            db.log_login_attempt(username, 'rate limit lockout', client_ip, user_agent)
+            return jsonify({'success': False, 'message': f'This account is locked for {seconds_left} seconds'}), 429
+            
 
         # Verify login using database
         if not db.login(username, password):
-            now = time.time()
-            record = user_login_attempts.get(username, {'failed': 0, 'locked_until': 0})
+            user_info['failed'] += 1
+            user_info['rate_limit_failed'] += 1
+            # lockout check
+            if user_info['failed'] >= LOCKOUT_THRESHOLD:
+                user_info['locked_forever'] = True
+                latency_ms = int((time.time() - login_start) * 1000)
+                log_login_attempt_json(username, db.group_seed, hash_mode, 'permanent lockout', 'permanent lockout', latency_ms)
+                db.log_login_attempt(username, 'permanent lockout', client_ip, user_agent)
+                return jsonify({'success': False, 'message': 'This Account is permanently locked. Please contact admin.'}), 423
 
-            if now >= record.get('locked_until', 0):
-                record['failed'] += 1
-                if record['failed'] >= ATTEMPTS_LIMIT:
-                    record['locked_until'] = now + LOCK_TIME_SEC
-                    record['failed'] = 0
-                user_login_attempts[username] = record
+            # rate limit check
+            if user_info['rate_limit_failed'] >= RATE_LIMIT_ATTEMPTS:
+                user_info['locked_until'] = now + RATE_LIMIT_LOCK_SEC
+                user_info['rate_limit_failed'] = 0
+                locked_until = user_info.get('locked_until',0)
+                seconds_left = int(locked_until - time.time())
+
+                latency_ms = int((time.time() - login_start) * 1000)
+                log_login_attempt_json(username, db.group_seed, hash_mode, 'rate limit lockout', 'rate limit lockout', latency_ms)
+                db.log_login_attempt(username, 'rate limit lockout', client_ip, user_agent)
+                if  user_info['failed'] != LOCKOUT_THRESHOLD:
+                    return jsonify({'success': False, 'message': f'This account is locked for {seconds_left} seconds'}), 429
+                     
+            user_login_attempts[username] = user_info
+            # if no lockout is applicable in this login attempt
             latency_ms = int((time.time() - login_start) * 1000)
             log_login_attempt_json(username, db.group_seed, hash_mode, '', 'failed', latency_ms)
             db.log_login_attempt(username, 'failed', client_ip, user_agent)
@@ -235,8 +284,15 @@ def api_login():
         # Login successful
         session['username'] = username
         session.permanent = True
-        # initialize for rate-limit
-        user_login_attempts[username] = {'failed': 0, 'locked_until': 0}
+
+        # Login successful - reset state for lockout and rate limit
+        user_login_attempts[username] = {
+            'failed': 0,
+            'locked_until': 0,
+            'locked_forever': False,
+            'rate_limit_failed': 0,
+
+        }
 
         # get user record from DB to determine if TOTP is required
         totp_secret = user_record.totp if user_record and hasattr(user_record, 'totp') else ''
@@ -266,7 +322,6 @@ def api_login():
         latency_ms = int((time.time() - login_start) * 1000)
         log_login_attempt_json('', db.group_seed, '', '', f'error: {str(e)[:50]}', latency_ms)
         return jsonify({'success': False, 'message': str(e)}), 500
-
 
 
 @app.route('/api/verify-totp', methods=['POST'])

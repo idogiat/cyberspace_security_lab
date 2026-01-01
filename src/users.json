@@ -60,6 +60,14 @@
         {
             "username": "Dave99",
             "totp_secret": "UPKLZG7T63QNMJQGMHGPI4CT6AX5SFVL"
+        },
+        {
+            "username": "bob",
+            "totp_secret": ""
+        },
+        {
+            "username": "randy",
+            "totp_secret": ""
         }
     ]
 }
