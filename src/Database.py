@@ -116,6 +116,8 @@ class DB:
                             hashed_password = bcrypt.hashpw(password.encode(), salt).decode()
 
                     case "SHA-256 + SALT":
+                        print(pepper_flag)
+                        print(PEPPER)
                         # generate a random salt value
                         salt = os.urandom(16).hex()
                         password = password + salt
@@ -200,8 +202,9 @@ class DB:
                     case "Argon2":
                         ph = PasswordHasher(
                             time_cost=1,
-                            memory_cost=65536,  # 64 MB
-                            parallelism=1)
+                            memory_cost=65536,
+                            parallelism=1
+                        )   
                         if user.pepper:
                             password_input = password_input + PEPPER
                         try:
