@@ -1,3 +1,4 @@
+import secrets
 from flask import Flask, render_template, request, jsonify, redirect, session, url_for
 from datetime import timedelta, datetime
 import json
@@ -19,19 +20,36 @@ CONFIG_PATH = os.path.join(os.path.dirname(__file__), './config.json')
 with open(CONFIG_PATH, 'r') as f:
     CONFIG = json.load(f)
 
-# make sure that LOCKOUT_THRESHOLD > RATE_LIMIT_ATTEMPTS
+# CAPTCHA_TOKENS = {
+#     "<username1>": <captcha_token1>,
+#     "<username2>": <captcha_token2>,
+#     ...
+# }
+CAPTCHA_TOKENS = {}
+
+
+
+# this app only supports these protection options:
+# CAPTCHA_THRESHOLD 
+# LOCKOUT_THRESHOLD
+# RATE_LIMIT_ATTEMPTS
+# LOCKOUT_THRESHOLD + RATE_LIMIT_ATTEMPTS (Make sure LOCKOUT_THRESHOLD > RATE_LIMIT_ATTEMPTS)
+# to turn on the protection option please modify the config.json file filed accordingly 
+
 LOCKOUT_THRESHOLD = CONFIG.get('LOCKOUT_THRESHOLD', 5)
 RATE_LIMIT_ATTEMPTS = CONFIG.get('RATE_LIMIT_ATTEMPTS', 3)
 RATE_LIMIT_LOCK_SEC = CONFIG.get('RATE_LIMIT_LOCK_SEC', 120)
-
-
-# ATTEMPTS_LIMIT = 5 # Max tokens per username
-# LOCK_TIME_SEC = 120
+RATE_LIMIT_ACTIVATED = CONFIG.get('RATE_LIMIT_ACTIVATED', False)
+LOCKOUT_ACTIVATED = CONFIG.get('LOCKOUT_ACTIVATED', False)
+CAPTCHA_ACTIVATED = CONFIG.get('CAPTCHA_ACTIVATED', False)
+CAPTCHA_THRESHOLD = CONFIG.get('CAPTCHA_THRESHOLD', 5)
 
 # user_login_attempts = {
 #     "<username>": {
-#         "failed": <int>,        # consecutive number of failed attemps
+#         'failed': <int>,        # consecutive number of failed attemps
 #         "locked_until": <float> # timestamp
+#         'locked_forever': <BOOL>, # flag to indicate if existing username is locked
+#         'rate_limit_failed': <INT> # consecutive failed attemps to count rate limit
 #     },
 #     ...
 # }
@@ -47,6 +65,15 @@ if not login_logger.handlers:
     handler.setFormatter(formatter)
     login_logger.addHandler(handler)
     login_logger.setLevel(logging.INFO)
+
+
+def get_or_create_captcha_token(username):
+    """return a new or existing captcha token for a specific username"""
+    token = CAPTCHA_TOKENS.get(username)
+    if not token:
+        token = secrets.token_hex(16)
+        CAPTCHA_TOKENS[username] = token
+    return token
 
 def log_login_attempt_json(username, group_seed, hash_mode, protection_flags, result, latency_ms):
     """Log a login attempt with all required fields as JSON."""
@@ -121,7 +148,6 @@ def api_register():
         totp = data.get('use_totp', False)  # default to no totp
         use_pepper = data.get('use_pepper', False)
 
-
         if not username or len(username) < 3:
             return jsonify({'success': False, 'message': 'Username must be at least 3 characters'}), 400
 
@@ -160,7 +186,7 @@ def api_register():
             # if DB raised IntegrityError it bubbles up - return conflict
             return jsonify({'success': False, 'message': str(e)}), 500
 
-      
+        print('before update_json_file')
         update_json_file(username, totp_secret)
 
         return jsonify({
@@ -176,21 +202,24 @@ def api_register():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 def update_json_file(username, totp_secret):
-            json_path = os.path.join(os.path.dirname(__file__), 'users.json')
-            try:
-                if not os.path.exists(json_path):
-                    users_json = {"group_seed": 524392612, "users": []}
-                else:
-                    with open(json_path, 'r', encoding='utf-8') as f:
-                        users_json = json.load(f)
-                users_json["users"].append({
-                    "username": username,
-                    "totp_secret": totp_secret
-                })
-                with open(json_path, 'w', encoding='utf-8') as f:
-                    json.dump(users_json, f, ensure_ascii=False, indent=4)
-            except Exception as e:
-                print(f"Failed to update users.json file: {e}")
+    """updates users.json file with relavent username and their totp secret (or '' if not available)"""
+    json_path = os.path.join(os.path.dirname(__file__), 'users.json')
+    print(json_path)
+    try:
+        if not os.path.exists(json_path):
+            users_json = {"group_seed": 524392612, "users": []}
+        else:
+            with open(json_path, 'r', encoding='utf-8') as f:
+                users_json = json.load(f)
+        users_json["users"].append({
+            "username": username,
+            "totp_secret": totp_secret
+        })
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(users_json, f, ensure_ascii=False, indent=4)
+            print(users_json["users"])
+    except Exception as e:
+        print(f"Failed to update users.json file: {e}")
 
 @app.route('/api/login', methods=['POST'])
 def api_login():
@@ -199,6 +228,8 @@ def api_login():
         data = request.get_json()
         username = data.get('username', '').strip()
         password = data.get('password', '').strip()
+        captcha_token = data.get('captcha_token', '')
+
 
         # Get client info for logging
         now = time.time()
@@ -212,6 +243,7 @@ def api_login():
         user_record = users[0] if users else None
         hash_mode = user_record.hash_mode if user_record else ''
         
+        # if no usernmae or no password was provided in the request
         if not username or not password:
             latency_ms = int((time.time() - login_start) * 1000)
             log_login_attempt_json(username or 'unknown', db.group_seed, '', '', 'failed', latency_ms)
@@ -223,6 +255,55 @@ def api_login():
             log_login_attempt_json(username, db.group_seed, '', '', 'failed', latency_ms)
             db.log_login_attempt(username, 'failed', client_ip, user_agent)
             return jsonify({'success': False, 'message': 'Invalid username or password'}), 401
+
+        user_info = user_login_attempts.get(username, {
+            'failed': 0,
+            'locked_until': 0,
+            'locked_forever': False,
+            'rate_limit_failed': 0,
+        })
+        print(user_info['failed'])
+        print(user_info['rate_limit_failed'])
+        print(RATE_LIMIT_ACTIVATED)
+        # User Locked forever check
+        if user_info.get('locked_forever', False):
+            log_login_attempt_json(username, db.group_seed, '', 'lockout', 'permanent lockout', latency_ms)
+            db.log_login_attempt(username, 'permanent lockout', client_ip, user_agent)
+            return jsonify({'success': False, 'message': 'This Account is permanently locked. Please contact admin.'}), 423
+
+        # CAPTCHA SECTION
+        if user_info['failed'] >= CAPTCHA_THRESHOLD - 1 and CAPTCHA_ACTIVATED:
+            # check if captcha token was sent by the frontend/user
+            token_needed = CAPTCHA_TOKENS.get(username)
+            if captcha_token:
+                if captcha_token == token_needed:
+                    # if sent token was right
+                    user_info['failed'] = 0
+                    if username in CAPTCHA_TOKENS:
+                        del CAPTCHA_TOKENS[username]
+                    # afterwards the regular credentials check
+                else:
+                    log_login_attempt_json(username, db.group_seed, '', 'Captcha', 'Captcha required', latency_ms)
+                    db.log_login_attempt(username, 'Captcha required', client_ip, user_agent)
+                    return jsonify({'success': False, 'message': 'Invalid CAPTCHA token'}), 401
+            else:
+                # if no token exists for <username>, create a new one
+                if not token_needed:
+                    token_needed = secrets.token_hex(16)
+                    CAPTCHA_TOKENS[username] = token_needed
+                log_login_attempt_json(username, db.group_seed, '', 'Captcha', 'Captcha required', latency_ms)
+                db.log_login_attempt(username, 'Captcha required', client_ip, user_agent)
+                return jsonify({'captcha_required': True, 'captcha_token': token_needed,
+                                 'message':'exceeded failed attemps captcha thresholds, please provide captcha token'}), 429
+
+        # Rate-Limit validation
+        locked_until = user_info.get('locked_until',0)
+        seconds_left = int(locked_until - time.time())
+        if seconds_left > 0:
+            log_login_attempt_json(username, db.group_seed, '', 'rate-limit', 'rate limit lockout', latency_ms)
+            db.log_login_attempt(username, 'rate limit lockout', client_ip, user_agent)
+            return jsonify({'success': False, 'message': f'This account is locked for {seconds_left} seconds'}), 429
+            
 
         user_info = user_login_attempts.get(username, {
             'failed': 0,
@@ -246,17 +327,12 @@ def api_login():
             return jsonify({'success': False, 'message': f'This account is locked for {seconds_left} seconds'}), 429
             
 
-        # Get user record to extract hash_mode
-        users = db.get_user(username)
-        user_record = users[0] if users else None
-        hash_mode = user_record.hash_mode if user_record else ''
-
         # Verify login using database
         if not db.login(username, password):
             user_info['failed'] += 1
             user_info['rate_limit_failed'] += 1
             # lockout check
-            if user_info['failed'] >= LOCKOUT_THRESHOLD:
+            if user_info['failed'] >= LOCKOUT_THRESHOLD and LOCKOUT_ACTIVATED:
                 user_info['locked_forever'] = True
                 latency_ms = int((time.time() - login_start) * 1000)
                 log_login_attempt_json(username, db.group_seed, hash_mode, 'permanent lockout', 'permanent lockout', latency_ms)
@@ -264,18 +340,19 @@ def api_login():
                 return jsonify({'success': False, 'message': 'This Account is permanently locked. Please contact admin.'}), 423
 
             # rate limit check
-            if user_info['rate_limit_failed'] >= RATE_LIMIT_ATTEMPTS:
+            if user_info['rate_limit_failed'] >= RATE_LIMIT_ATTEMPTS and RATE_LIMIT_ACTIVATED :
+                print(user_info['rate_limit_failed'])
                 user_info['locked_until'] = now + RATE_LIMIT_LOCK_SEC
                 user_info['rate_limit_failed'] = 0
                 locked_until = user_info.get('locked_until',0)
                 seconds_left = int(locked_until - time.time())
-
+            
                 latency_ms = int((time.time() - login_start) * 1000)
                 log_login_attempt_json(username, db.group_seed, hash_mode, 'rate limit lockout', 'rate limit lockout', latency_ms)
                 db.log_login_attempt(username, 'rate limit lockout', client_ip, user_agent)
                 if  user_info['failed'] != LOCKOUT_THRESHOLD:
                     return jsonify({'success': False, 'message': f'This account is locked for {seconds_left} seconds'}), 429
-                     
+            
             user_login_attempts[username] = user_info
             # if no lockout is applicable in this login attempt
             latency_ms = int((time.time() - login_start) * 1000)
@@ -286,6 +363,15 @@ def api_login():
         # Login successful
         session['username'] = username
         session.permanent = True
+
+        # Login successful - reset state for lockout and rate limit
+        user_login_attempts[username] = {
+            'failed': 0,
+            'locked_until': 0,
+            'locked_forever': False,
+            'rate_limit_failed': 0,
+
+        }
 
         # Login successful - reset state for lockout and rate limit
         user_login_attempts[username] = {
@@ -471,6 +557,18 @@ def statistics():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
+
+@app.route('/admin/get_captcha_token')
+def get_captcha_token():
+    group_seed = request.args.get('group_seed', '')
+    username = request.args.get('username', '')
+    if group_seed != str(db.group_seed):
+        return jsonify({"error": "Invalid group_seed"}), 401
+    token = CAPTCHA_TOKENS.get(username)
+    if not token:
+        token = secrets.token_hex(16)
+        CAPTCHA_TOKENS[username] = token
+    return jsonify({"captcha_token": token}), 200
 
 @app.errorhandler(404)
 def not_found(error):

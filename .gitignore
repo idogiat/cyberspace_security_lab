@@ -1,0 +1,5 @@
+attempts.log
+users.db
+src/__pycache__/
+*.pyc
+src/users.json
