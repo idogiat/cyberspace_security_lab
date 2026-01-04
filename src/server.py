@@ -1,16 +1,19 @@
-import secrets
-from flask import Flask, render_template, request, jsonify, redirect, session, url_for
-from datetime import timedelta, datetime
-import json
-import sys
 import os
+import sys
 import time
-import logging
-
+import json
 import pyotp
 import qrcode
-from io import BytesIO
 import base64
+import secrets
+import logging
+
+from io import BytesIO
+from datetime import timedelta, datetime
+from flask import Flask, render_template, request, jsonify, redirect, session, url_for
+
+from common import ServerStatus
+
 
 # Ensure src is on path so imports work when running from repo root
 sys.path.insert(0, os.path.dirname(__file__))
@@ -26,7 +29,6 @@ with open(CONFIG_PATH, 'r') as f:
 #     ...
 # }
 CAPTCHA_TOKENS = {}
-
 
 
 # this app only supports these protection options:
@@ -149,14 +151,14 @@ def api_register():
         use_pepper = data.get('use_pepper', False)
 
         if not username or len(username) < 3:
-            return jsonify({'success': False, 'message': 'Username must be at least 3 characters'}), 400
+            return jsonify({'success': False, 'message': 'Username must be at least 3 characters'}), ServerStatus.BAD_REQUEST.value
 
         if not password or len(password) < 6:
-            return jsonify({'success': False, 'message': 'Password must be at least 6 characters'}), 400
+            return jsonify({'success': False, 'message': 'Password must be at least 6 characters'}), ServerStatus.BAD_REQUEST.value
 
         # Check if user exists using database
         if db.user_exists(username):
-            return jsonify({'success': False, 'message': 'Username already exists'}), 409
+            return jsonify({'success': False, 'message': 'Username already exists'}), ServerStatus.CONFLICT.value
 
         totp_secret = ''
         if totp:
@@ -184,7 +186,7 @@ def api_register():
             db.register(username, password, hash_mode, totp_secret, use_pepper)
         except Exception as e:
             # if DB raised IntegrityError it bubbles up - return conflict
-            return jsonify({'success': False, 'message': str(e)}), 500
+            return jsonify({'success': False, 'message': str(e)}), ServerStatus.INTERNAL_ERROR.value
 
         print('before update_json_file')
         update_json_file(username, totp_secret)
@@ -196,10 +198,10 @@ def api_register():
             'totp_secret': totp_secret if totp else None,
             'otpauth_uri': otpauth_uri,
             'qr_code': qr_data_uri
-        }), 201
+        }), ServerStatus.CREATED.value
 
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': str(e)}), ServerStatus.INTERNAL_ERROR.value
 
 def update_json_file(username, totp_secret):
     """updates users.json file with relavent username and their totp secret (or '' if not available)"""
@@ -248,13 +250,13 @@ def api_login():
             latency_ms = int((time.time() - login_start) * 1000)
             log_login_attempt_json(username or 'unknown', db.group_seed, '', '', 'failed', latency_ms)
             db.log_login_attempt(username or 'unknown', 'failed', client_ip, user_agent)
-            return jsonify({'success': False, 'message': 'Username and password required'}), 400
+            return jsonify({'success': False, 'message': 'Username and password required'}), ServerStatus.BAD_REQUEST.value
         
         # this check prevents locking a username that does not exist
         if not user_exists:
             log_login_attempt_json(username, db.group_seed, '', '', 'failed', latency_ms)
             db.log_login_attempt(username, 'failed', client_ip, user_agent)
-            return jsonify({'success': False, 'message': 'Invalid username or password'}), 401
+            return jsonify({'success': False, 'message': 'Invalid username or password'}), ServerStatus.UNAUTHORIZED.value
 
         user_info = user_login_attempts.get(username, {
             'failed': 0,
@@ -269,7 +271,7 @@ def api_login():
         if user_info.get('locked_forever', False):
             log_login_attempt_json(username, db.group_seed, '', 'lockout', 'permanent lockout', latency_ms)
             db.log_login_attempt(username, 'permanent lockout', client_ip, user_agent)
-            return jsonify({'success': False, 'message': 'This Account is permanently locked. Please contact admin.'}), 423
+            return jsonify({'success': False, 'message': 'This Account is permanently locked. Please contact admin.'}), ServerStatus.PERMANENT_LOCKOUT.value
 
         # CAPTCHA SECTION
         if user_info['failed'] >= CAPTCHA_THRESHOLD - 1 and CAPTCHA_ACTIVATED:
@@ -285,7 +287,7 @@ def api_login():
                 else:
                     log_login_attempt_json(username, db.group_seed, '', 'Captcha', 'Captcha required', latency_ms)
                     db.log_login_attempt(username, 'Captcha required', client_ip, user_agent)
-                    return jsonify({'success': False, 'message': 'Invalid CAPTCHA token'}), 401
+                    return jsonify({'success': False, 'message': 'Invalid CAPTCHA token'}), ServerStatus.UNAUTHORIZED.value
             else:
                 # if no token exists for <username>, create a new one
                 if not token_needed:
@@ -294,7 +296,7 @@ def api_login():
                 log_login_attempt_json(username, db.group_seed, '', 'Captcha', 'Captcha required', latency_ms)
                 db.log_login_attempt(username, 'Captcha required', client_ip, user_agent)
                 return jsonify({'captcha_required': True, 'captcha_token': token_needed,
-                                 'message':'exceeded failed attemps captcha thresholds, please provide captcha token'}), 429
+                                 'message':'exceeded failed attemps captcha thresholds, please provide captcha token'}), ServerStatus.TOO_MANY_REQUESTS.value
 
         # Rate-Limit validation
         locked_until = user_info.get('locked_until',0)
@@ -302,7 +304,7 @@ def api_login():
         if seconds_left > 0:
             log_login_attempt_json(username, db.group_seed, '', 'rate-limit', 'rate limit lockout', latency_ms)
             db.log_login_attempt(username, 'rate limit lockout', client_ip, user_agent)
-            return jsonify({'success': False, 'message': f'This account is locked for {seconds_left} seconds'}), 429
+            return jsonify({'success': False, 'message': f'This account is locked for {seconds_left} seconds'}), ServerStatus.TOO_MANY_REQUESTS.value
             
 
         user_info = user_login_attempts.get(username, {
@@ -316,7 +318,7 @@ def api_login():
         if user_info.get('locked_forever', False):
             log_login_attempt_json(username, db.group_seed, '', 'lockout', 'permanent lockout', latency_ms)
             db.log_login_attempt(username, 'permanent lockout', client_ip, user_agent)
-            return jsonify({'success': False, 'message': 'This Account is permanently locked. Please contact admin.'}), 423
+            return jsonify({'success': False, 'message': 'This Account is permanently locked. Please contact admin.'}), ServerStatus.PERMANENT_LOCKOUT.value
 
         # Rate-Limit validation
         locked_until = user_info.get('locked_until',0)
@@ -324,7 +326,7 @@ def api_login():
         if seconds_left > 0:
             log_login_attempt_json(username, db.group_seed, '', 'rate-limit', 'rate limit lockout', latency_ms)
             db.log_login_attempt(username, 'rate limit lockout', client_ip, user_agent)
-            return jsonify({'success': False, 'message': f'This account is locked for {seconds_left} seconds'}), 429
+            return jsonify({'success': False, 'message': f'This account is locked for {seconds_left} seconds'}), ServerStatus.TOO_MANY_REQUESTS.value
             
 
         # Verify login using database
@@ -337,7 +339,7 @@ def api_login():
                 latency_ms = int((time.time() - login_start) * 1000)
                 log_login_attempt_json(username, db.group_seed, hash_mode, 'permanent lockout', 'permanent lockout', latency_ms)
                 db.log_login_attempt(username, 'permanent lockout', client_ip, user_agent)
-                return jsonify({'success': False, 'message': 'This Account is permanently locked. Please contact admin.'}), 423
+                return jsonify({'success': False, 'message': 'This Account is permanently locked. Please contact admin.'}), ServerStatus.PERMANENT_LOCKOUT.value
 
             # rate limit check
             if user_info['rate_limit_failed'] >= RATE_LIMIT_ATTEMPTS and RATE_LIMIT_ACTIVATED :
@@ -351,14 +353,14 @@ def api_login():
                 log_login_attempt_json(username, db.group_seed, hash_mode, 'rate limit lockout', 'rate limit lockout', latency_ms)
                 db.log_login_attempt(username, 'rate limit lockout', client_ip, user_agent)
                 if  user_info['failed'] != LOCKOUT_THRESHOLD:
-                    return jsonify({'success': False, 'message': f'This account is locked for {seconds_left} seconds'}), 429
+                    return jsonify({'success': False, 'message': f'This account is locked for {seconds_left} seconds'}), ServerStatus.TOO_MANY_REQUESTS.value
             
             user_login_attempts[username] = user_info
             # if no lockout is applicable in this login attempt
             latency_ms = int((time.time() - login_start) * 1000)
             log_login_attempt_json(username, db.group_seed, hash_mode, '', 'failed', latency_ms)
             db.log_login_attempt(username, 'failed', client_ip, user_agent)
-            return jsonify({'success': False, 'message': 'Invalid username or password'}), 401
+            return jsonify({'success': False, 'message': 'Invalid username or password'}), ServerStatus.UNAUTHORIZED.value
 
         # Login successful
         session['username'] = username
@@ -396,7 +398,7 @@ def api_login():
                 'message': 'TOTP required',
                 'username': username,
                 'redirect': '/totp-verify'
-            }), 200
+            }), ServerStatus.OK.value
 
         # No TOTP configured — mark verified and finish login
         session['totp_verified'] = True
@@ -404,12 +406,12 @@ def api_login():
         log_login_attempt_json(username, db.group_seed, hash_mode, '', 'success', latency_ms)
         db.log_login_attempt(username, 'success', client_ip, user_agent)
 
-        return jsonify({'success': True, 'message': 'Login successful', 'username': username, 'redirect': '/dashboard'}), 200
+        return jsonify({'success': True, 'message': 'Login successful', 'username': username, 'redirect': '/dashboard'}), OK
 
     except Exception as e:
         latency_ms = int((time.time() - login_start) * 1000)
         log_login_attempt_json('', db.group_seed, '', '', f'error: {str(e)[:50]}', latency_ms)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': str(e)}), ServerStatus.INTERNAL_ERROR.value
 
 
 @app.route('/api/verify-totp', methods=['POST'])
@@ -417,7 +419,7 @@ def verify_totp():
     try:
         # verify user has passed the log in
         if 'username' not in session:
-            return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+            return jsonify({'success': False, 'message': 'Not authenticated'}), ServerStatus.UNAUTHORIZED.value
         
         # Get client info from log in
         data = request.get_json()
@@ -430,12 +432,12 @@ def verify_totp():
 
         # check if user has TOTP
         if not user_records or not hasattr(user_records, 'totp'):
-            return jsonify({'success': False, 'message': 'User TOTP secret not found'}), 400
+            return jsonify({'success': False, 'message': 'User TOTP secret not found'}), ServerStatus.BAD_REQUEST.value
         
         # get the TOTP value
         totp_secret = user_records.totp or ''
         if not totp_secret:
-            return jsonify({'success': False, 'message': 'User does not have TOTP enabled'}), 400
+            return jsonify({'success': False, 'message': 'User does not have TOTP enabled'}), ServerStatus.BAD_REQUEST.value
 
         # TOTP verification
         totp_verifier = pyotp.TOTP(totp_secret)
@@ -447,12 +449,12 @@ def verify_totp():
             user_agent = request.headers.get('User-Agent', 'Unknown')
             db.log_login_attempt(username, 'success', client_ip, user_agent)
             
-            return jsonify({'success': True, 'message': 'TOTP verified! Redirecting to dashboard page'}), 200
+            return jsonify({'success': True, 'message': 'TOTP verified! Redirecting to dashboard page'}), OK
         
         else:
-            return jsonify({'success': False, 'message': 'Invalid TOTP code. Please check and try again.'}), 401
+            return jsonify({'success': False, 'message': 'Invalid TOTP code. Please check and try again.'}), ServerStatus.UNAUTHORIZED.value
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': str(e)}), ServerStatus.INTERNAL_ERROR.value
 
 
 @app.route('/api/logout', methods=['POST'])
@@ -462,28 +464,28 @@ def api_logout():
     user_agent = request.headers.get('User-Agent', 'Unknown')
     db.log_login_attempt(username, 'logout', client_ip, user_agent)
     session.clear()
-    return jsonify({'success': True, 'message': 'Logged out'}), 200
+    return jsonify({'success': True, 'message': 'Logged out'}), OK
 
 @app.route('/api/health', methods=['GET'])
 def health():
-    return jsonify({'status': 'healthy', 'message': 'Server is running'}), 200
+    return jsonify({'status': 'healthy', 'message': 'Server is running'}), OK
 
 @app.route('/api/user', methods=['GET'])
 def get_user():
     if 'username' not in session:
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
-    return jsonify({'success': True, 'username': session['username']}), 200
+        return jsonify({'success': False, 'message': 'Not authenticated'}), ServerStatus.UNAUTHORIZED.value
+    return jsonify({'success': True, 'username': session['username']}), OK
 
 @app.route('/api/user-details/<username>', methods=['GET'])
 def user_details(username):
     """Get detailed user information"""
     if 'username' not in session:
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': 'Not authenticated'}), ServerStatus.UNAUTHORIZED.value
 
     try:
         users = db.get_user(username)
         if not users:
-            return jsonify({'success': False, 'message': 'User not found'}), 404
+            return jsonify({'success': False, 'message': 'User not found'}), ServerStatus.NOT_FOUND.value
 
         user_obj = users[0]  # get_user returns a list
         return jsonify({
@@ -498,15 +500,15 @@ def user_details(username):
                 'totp': user_obj.totp,
                 'pepper': user_obj.pepper
             }
-        }), 200
+        }), OK
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': str(e)}), ServerStatus.INTERNAL_ERROR.value
 
 @app.route('/api/login-logs', methods=['GET'])
 def get_login_logs():
     """Get login logs (admin endpoint - add authentication as needed)"""
     if 'username' not in session:
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': 'Not authenticated'}), ServerStatus.UNAUTHORIZED.value
 
     try:
         username = request.args.get('username', None)
@@ -524,15 +526,15 @@ def get_login_logs():
             }
             for log in logs
         ]
-        return jsonify({'success': True, 'logs': logs_data}), 200
+        return jsonify({'success': True, 'logs': logs_data}), OK
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': str(e)}), ServerStatus.INTERNAL_ERROR.value
 
 @app.route('/api/statistics', methods=['GET'])
 def statistics():
     """Get statistics: total users, successful/failed logins today"""
     if 'username' not in session:
-        return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        return jsonify({'success': False, 'message': 'Not authenticated'}), ServerStatus.UNAUTHORIZED.value
 
     try:
         # Get all login logs
@@ -553,9 +555,9 @@ def statistics():
             'totalUsers': total_users,
             'successfulLogins': successful_logins,
             'failedLogins': failed_logins
-        }), 200
+        }), OK
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': str(e)}), ServerStatus.INTERNAL_ERROR.value
 
 
 @app.route('/admin/get_captcha_token')
@@ -563,20 +565,20 @@ def get_captcha_token():
     group_seed = request.args.get('group_seed', '')
     username = request.args.get('username', '')
     if group_seed != str(db.group_seed):
-        return jsonify({"error": "Invalid group_seed"}), 401
+        return jsonify({"error": "Invalid group_seed"}), ServerStatus.UNAUTHORIZED.value
     token = CAPTCHA_TOKENS.get(username)
     if not token:
         token = secrets.token_hex(16)
         CAPTCHA_TOKENS[username] = token
-    return jsonify({"captcha_token": token}), 200
+    return jsonify({"captcha_token": token}), OK
 
-@app.errorhandler(404)
+@app.errorhandler(ServerStatus.NOT_FOUND.value)
 def not_found(error):
-    return jsonify({'error': 'Endpoint not found'}), 404
+    return jsonify({'error': 'Endpoint not found'}), ServerStatus.NOT_FOUND.value
 
-@app.errorhandler(500)
+@app.errorhandler(ServerStatus.INTERNAL_ERROR.value)
 def server_error(error):
-    return jsonify({'error': 'Server error'}), 500
+    return jsonify({'error': 'Server error'}), ServerStatus.INTERNAL_ERROR.value
 
 
 def create_app():

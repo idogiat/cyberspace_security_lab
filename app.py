@@ -23,19 +23,19 @@ if __name__ == "__main__":
     sleep(3)  # Give the server time to start
     
     print("\n=== Generating Test Dataset (30 users: 10 weak + 10 medium + 10 strong) ===")
-    subprocess.run([venv_python, "automation/test_users_generator.py", 
+    subprocess.run([venv_python, "-m", "automation.test_users_generator", 
                    "--type", "weak",
                    "--count", "10",
                    "--host", "http://localhost:5000",
                    "--enable-totp",
                    "--output", "test_credentials.json"])
-    subprocess.run([venv_python, "automation/test_users_generator.py", 
+    subprocess.run([venv_python, "-m", "automation.test_users_generator", 
                    "--type", "medium",
                    "--count", "10",
                    "--host", "http://localhost:5000",
                    "--enable-totp",
                    "--output", "test_credentials.json"])
-    subprocess.run([venv_python, "automation/test_users_generator.py", 
+    subprocess.run([venv_python, "-m", "automation.test_users_generator", 
                    "--type", "strong",
                    "--count", "10",
                    "--host", "http://localhost:5000",

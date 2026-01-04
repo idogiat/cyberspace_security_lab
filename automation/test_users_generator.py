@@ -19,6 +19,8 @@ import pyotp
 import os
 from functools import partial
 
+from src.common import ServerStatus
+
 # Password strength generators for security testing
 get_randint = partial(random.randint, 0, 10)
 
@@ -107,12 +109,12 @@ def generate_users():
     args = parser.parse_args()
 
     creds = []
-    user_count = 0
     
     # If dataset mode, generate 10 users per category
     if args.type:
         print(f"Dataset mode: Creating {args.type} passwords for {args.count} users")
-        for i in range(args.count):
+        counter = 1
+        while counter <= args.count:
             if args.type == 'weak':
                 password_gen = weak_password_generator()
             elif args.type == 'medium':
@@ -123,7 +125,7 @@ def generate_users():
                 print(f"Unknown password type: {args.type}")
                 continue
             
-            username = f"{args.prefix}_{args.type}_{i}"
+            username = f"{args.prefix}_{args.type}_{counter}"
                 
             totp_secret = ''
             if args.enable_totp:
@@ -142,15 +144,20 @@ def generate_users():
             try:
                 r = requests.post(f"{args.host}/api/register", json=payload, timeout=10)
                 status = r.status_code
-                print(f"attempt {user_count+1} -> {username} ({args.type}) -> {status}")
-                if status in (200, 201):
+                print(f"attempt {counter} -> {username} ({args.type}) -> {status}")
+                if status in (ServerStatus.OK.value, ServerStatus.CREATED.value):
                     cred = {"username": username, "password": password_gen, "strength": args.type}
                     if totp_secret:
                         cred["totp_secret"] = totp_secret
                     creds.append(cred)
-                    user_count += 1
+                    counter += 1
                 else:
-                    print(f"  Registration failed: {r.status_code} {r.text}")
+                    if status == ServerStatus.CONFLICT.value:
+                        print(f" username {username} already exists, skipping.")
+                        counter += 1
+                        args.count += 1
+                    else:
+                        print(f"Registration failed: {r.status_code} {r.text}")
             
             except Exception as e:
                 print(f'  error: {e}')
@@ -158,8 +165,9 @@ def generate_users():
     else:
         # Original mode: use single password for all users
         password = args.password or "Password1"
-        for i in range(args.count):
-            username = gen_username(i if not args.random else None, prefix=args.prefix, randomize=args.random, length=args.random_length)
+        counter = 1
+        while counter <= args.count:
+            username = gen_username(counter if not args.random else None, prefix=args.prefix, randomize=args.random, length=args.random_length)
             
             # Generate TOTP secret if enabled
             totp_secret = ''
@@ -179,12 +187,14 @@ def generate_users():
             try:
                 r = requests.post(f"{args.host}/api/register", json=payload, timeout=10)
                 status = r.status_code
-                print(f"attempt {i+1} -> {username} -> {status}")
+                print(f"attempt {counter} -> {username} -> {status}")
                 if status in (200, 201):
                     cred = {"username": username, "password": password}
                     if totp_secret:
                         cred["totp_secret"] = totp_secret
                     creds.append(cred)
+                    counter += 1
+                    args.count += 1
 
                 else:
                     print(f"Registration failed for {username}: {r.status_code} {r.text}")
