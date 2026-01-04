@@ -9,15 +9,17 @@ Notes:
 - Run against your local/dev server only.
 - Use --dataset to generate users with weak/medium/strong passwords for security testing.
 """
-import requests
+import os
 import json
-import argparse
 import time
+import pyotp
 import random
 import string
-import pyotp
-import os
+import requests
+import argparse
 from functools import partial
+
+from src.common import ServerStatus, HashingAlgorithm
 
 # Password strength generators for security testing
 get_randint = partial(random.randint, 0, 10)
@@ -107,91 +109,64 @@ def generate_users():
     args = parser.parse_args()
 
     creds = []
-    user_count = 0
-    
-    # If dataset mode, generate 10 users per category
-    if args.type:
-        print(f"Dataset mode: Creating {args.type} passwords for {args.count} users")
-        for i in range(args.count):
-            if args.type == 'weak':
-                password_gen = weak_password_generator()
-            elif args.type == 'medium':
-                password_gen = medium_password_generator()
-            elif args.type == 'strong':
-                password_gen = strong_password_generator()
+    print(f"Dataset mode: Creating {args.type} passwords for {args.count} users")
+    counter = 1
+    use_pepper = False
+    while counter <= args.count:
+        if args.type == 'weak':
+            password_gen = weak_password_generator()
+            use_pepper = False
+        elif args.type == 'medium':
+            password_gen = medium_password_generator()
+            use_pepper ^= True 
+        elif args.type == 'strong':
+            password_gen = strong_password_generator()
+            use_pepper = True
+        else:
+            print(f"Unknown password type: {args.type}")
+            continue
+        
+        username = f"{args.prefix}_{args.type}_{counter}"
+            
+        totp_secret = ''
+        if args.enable_totp:
+            totp_secret = pyotp.random_base32()
+        
+        hash_mode_index = counter % len(HashingAlgorithm)
+        hash_mode = (list(HashingAlgorithm)[hash_mode_index]).value
+
+        payload = {
+            "username": username,
+            "password": password_gen,
+            "hash_mode": hash_mode,
+            "use_totp": args.enable_totp,
+            "use_pepper": use_pepper
+        }
+        
+        if totp_secret:
+            payload["totp_secret"] = totp_secret
+        
+        try:
+            r = requests.post(f"{args.host}/api/register", json=payload, timeout=10)
+            status = r.status_code
+            print(f"attempt {counter} -> {username} ({args.type}) -> {status}")
+            if status in (ServerStatus.OK.value, ServerStatus.CREATED.value):
+                cred = {"username": username, "password": password_gen, "strength": args.type}
+                if totp_secret:
+                    cred["totp_secret"] = totp_secret
+                creds.append(cred)
+                counter += 1
             else:
-                print(f"Unknown password type: {args.type}")
-                continue
-            
-            username = f"{args.prefix}_{args.type}_{i}"
-                
-            totp_secret = ''
-            if args.enable_totp:
-                totp_secret = pyotp.random_base32()
-            
-            payload = {
-                "username": username,
-                "password": password_gen,
-                "hash_mode": "bcrypt",
-                "use_totp": args.enable_totp
-            }
-            
-            if totp_secret:
-                payload["totp_secret"] = totp_secret
-            
-            try:
-                r = requests.post(f"{args.host}/api/register", json=payload, timeout=10)
-                status = r.status_code
-                print(f"attempt {user_count+1} -> {username} ({args.type}) -> {status}")
-                if status in (200, 201):
-                    cred = {"username": username, "password": password_gen, "strength": args.type}
-                    if totp_secret:
-                        cred["totp_secret"] = totp_secret
-                    creds.append(cred)
-                    user_count += 1
+                if status == ServerStatus.CONFLICT.value:
+                    print(f" username {username} already exists, skipping.")
+                    counter += 1
+                    args.count += 1
                 else:
-                    print(f"  Registration failed: {r.status_code} {r.text}")
-            
-            except Exception as e:
-                print(f'  error: {e}')
-                time.sleep(args.delay)
-    else:
-        # Original mode: use single password for all users
-        password = args.password or "Password1"
-        for i in range(args.count):
-            username = gen_username(i if not args.random else None, prefix=args.prefix, randomize=args.random, length=args.random_length)
-            
-            # Generate TOTP secret if enabled
-            totp_secret = ''
-            if args.enable_totp:
-                totp_secret = pyotp.random_base32()
-            
-            payload = {
-                "username": username,
-                "password": password,
-                "hash_mode": "bcrypt",
-                "use_totp": args.enable_totp
-            }
-            
-            if totp_secret:
-                payload["totp_secret"] = totp_secret
-            
-            try:
-                r = requests.post(f"{args.host}/api/register", json=payload, timeout=10)
-                status = r.status_code
-                print(f"attempt {i+1} -> {username} -> {status}")
-                if status in (200, 201):
-                    cred = {"username": username, "password": password}
-                    if totp_secret:
-                        cred["totp_secret"] = totp_secret
-                    creds.append(cred)
-
-                else:
-                    print(f"Registration failed for {username}: {r.status_code} {r.text}")
-
-            except Exception as e:
-                print('error', e)
-                time.sleep(args.delay)
+                    print(f"Registration failed: {r.status_code} {r.text}")
+        
+        except Exception as e:
+            print(f'  error: {e}')
+            time.sleep(args.delay)
     
     # Save credentials to file
     exists_users = []

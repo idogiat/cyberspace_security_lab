@@ -1,13 +1,13 @@
-import datetime
-import hashlib
-import json
 import os
-import sqlite3
-
 import bcrypt
-import pyotp
-from argon2 import PasswordHasher, exceptions as exceptions_from_argon2
+import hashlib
+import sqlite3
+import datetime
+
 from typing import NamedTuple
+from argon2 import PasswordHasher, exceptions as exceptions_from_argon2
+
+from common import HashingAlgorithm
 
 
 GROUP_SEED = 524392612  # to be corrected
@@ -93,7 +93,7 @@ class DB:
 
                 # Match hash modes and compute appropriate hash
                 match hash_mode:
-                    case "Argon2":
+                    case HashingAlgorithm.ARGON2.value:
                         # compute Argon2 encrypt + Salt 
                         ph = PasswordHasher(
                             time_cost=1,
@@ -105,7 +105,7 @@ class DB:
                             password = password + PEPPER
                         
                         hashed_password = ph.hash(password)
-                    case "bcrypt":
+                    case HashingAlgorithm.BCRYPT.value:
                         # In bcrypt the PEPPER is added to the password instead of to the salt
                         salt = bcrypt.gensalt(rounds=12)
                         if pepper_flag:
@@ -115,9 +115,7 @@ class DB:
                             # decode to make the password more readable (not affecting security)
                             hashed_password = bcrypt.hashpw(password.encode(), salt).decode()
 
-                    case "SHA-256 + SALT":
-                        print(pepper_flag)
-                        print(PEPPER)
+                    case HashingAlgorithm.SHA256_SALT.value:
                         # generate a random salt value
                         salt = os.urandom(16).hex()
                         password = password + salt
@@ -199,7 +197,7 @@ class DB:
             for user in users:
 
                 match user.hash_mode:
-                    case "Argon2":
+                    case HashingAlgorithm.ARGON2.value:
                         ph = PasswordHasher(
                             time_cost=1,
                             memory_cost=65536,
@@ -214,14 +212,14 @@ class DB:
                         except exceptions_from_argon2.VerifyMismatchError:
                             continue
                         
-                    case "bcrypt":
+                    case HashingAlgorithm.BCRYPT.value:
                         if user.pepper:
                             password_input = password_input + PEPPER
                         result = bcrypt.checkpw(password_input.encode(), user.password.encode())
                         if result:
                             return True
 
-                    case "SHA-256 + SALT":
+                    case HashingAlgorithm.SHA256_SALT.value:
 
                         password_input = password_input + user.salt
                         if user.pepper:
@@ -230,18 +228,6 @@ class DB:
                         if candidate_hash == user.password:
                             return True
 
-                    # case "SHA-256 + SALT + PEPPER":
-                    #     if not PEPPER:
-                    #         print("Requested SHA-256 + SALT + PEPPER mode but PEPPER was not provided")
-                    #     password_input = password_input + user.salt + PEPPER
-                    #     candidate_hash = hashlib.sha256(password_input.encode()).hexdigest()
-
-                    #     if candidate_hash == user.password:
-                    #         return True
-                    # case "TOTP":
-                    #     # TO DO
-                    #     pass
-                
                 return False
         except Exception as e:
             print(f"Error during login: {e}")
