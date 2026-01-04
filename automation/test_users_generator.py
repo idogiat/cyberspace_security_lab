@@ -176,7 +176,7 @@ def generate_users():
 
     with open(args.output, 'w', encoding='utf-8') as f:
         json.dump(exists_users + creds, f, indent=4, ensure_ascii=False)
-    print(f"\n✓ Credentials saved to {args.output} ({len(creds)} users)")
+    print(f"\nCredentials saved to {args.output} ({len(creds)} users)")
 
 
 if __name__ == '__main__':

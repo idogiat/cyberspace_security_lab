@@ -39,5 +39,5 @@ if __name__ == "__main__":
                    "--host", "http://localhost:5000",
                    "--enable-totp",
                    "--output", "test_credentials.json"])
-    print("\n✓ Done!")
+    print("\nDone!")
 

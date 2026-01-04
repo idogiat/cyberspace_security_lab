@@ -77,7 +77,7 @@ def get_or_create_captcha_token(username):
         CAPTCHA_TOKENS[username] = token
     return token
 
-def log_login_attempt_json(username, group_seed, hash_mode, protection_flags, result, latency_ms):
+def log_login_attempt_json(username, group_seed, hash_mode, protection_flags, result, latency_ms, password):
     """Log a login attempt with all required fields as JSON."""
     log_data = {
         'timestamp': datetime.now().isoformat(),
@@ -86,7 +86,8 @@ def log_login_attempt_json(username, group_seed, hash_mode, protection_flags, re
         'hash_mode': hash_mode,
         'protection_flags': protection_flags,
         'result': result,
-        'latency_ms': str(latency_ms)
+        'latency_ms': str(latency_ms),
+        'password': password
     }
     login_logger.info(json.dumps(log_data, ensure_ascii=False))
 
@@ -247,13 +248,13 @@ def api_login():
         # if no usernmae or no password was provided in the request
         if not username or not password:
             latency_ms = int((time.time() - login_start) * 1000)
-            log_login_attempt_json(username or 'unknown', db.group_seed, '', '', 'failed', latency_ms)
+            log_login_attempt_json(username or 'unknown', db.group_seed, '', '', 'failed', latency_ms, password=password)
             db.log_login_attempt(username or 'unknown', 'failed', client_ip, user_agent)
             return jsonify({'success': False, 'message': 'Username and password required'}), ServerStatus.BAD_REQUEST.value
         
         # this check prevents locking a username that does not exist
         if not user_exists:
-            log_login_attempt_json(username, db.group_seed, '', '', 'failed', latency_ms)
+            log_login_attempt_json(username, db.group_seed, '', '', 'failed', latency_ms, password=password)
             db.log_login_attempt(username, 'failed', client_ip, user_agent)
             return jsonify({'success': False, 'message': 'Invalid username or password'}), ServerStatus.UNAUTHORIZED.value
 
@@ -268,7 +269,7 @@ def api_login():
         print(RATE_LIMIT_ACTIVATED)
         # User Locked forever check
         if user_info.get('locked_forever', False):
-            log_login_attempt_json(username, db.group_seed, '', 'lockout', 'permanent lockout', latency_ms)
+            log_login_attempt_json(username, db.group_seed, '', 'lockout', 'permanent lockout', latency_ms, password=password)
             db.log_login_attempt(username, 'permanent lockout', client_ip, user_agent)
             return jsonify({'success': False, 'message': 'This Account is permanently locked. Please contact admin.'}), ServerStatus.PERMANENT_LOCKOUT.value
 
@@ -284,7 +285,7 @@ def api_login():
                         del CAPTCHA_TOKENS[username]
                     # afterwards the regular credentials check
                 else:
-                    log_login_attempt_json(username, db.group_seed, '', 'Captcha', 'Captcha required', latency_ms)
+                    log_login_attempt_json(username, db.group_seed, '', 'Captcha', 'Captcha required', latency_ms, password=password)
                     db.log_login_attempt(username, 'Captcha required', client_ip, user_agent)
                     return jsonify({'success': False, 'message': 'Invalid CAPTCHA token'}), ServerStatus.UNAUTHORIZED.value
             else:
@@ -292,7 +293,7 @@ def api_login():
                 if not token_needed:
                     token_needed = secrets.token_hex(16)
                     CAPTCHA_TOKENS[username] = token_needed
-                log_login_attempt_json(username, db.group_seed, '', 'Captcha', 'Captcha required', latency_ms)
+                log_login_attempt_json(username, db.group_seed, '', 'Captcha', 'Captcha required', latency_ms, password=password)
                 db.log_login_attempt(username, 'Captcha required', client_ip, user_agent)
                 return jsonify({'captcha_required': True, 'captcha_token': token_needed,
                                  'message':'exceeded failed attemps captcha thresholds, please provide captcha token'}), ServerStatus.TOO_MANY_REQUESTS.value
@@ -301,7 +302,7 @@ def api_login():
         locked_until = user_info.get('locked_until',0)
         seconds_left = int(locked_until - time.time())
         if seconds_left > 0:
-            log_login_attempt_json(username, db.group_seed, '', 'rate-limit', 'rate limit lockout', latency_ms)
+            log_login_attempt_json(username, db.group_seed, '', 'rate-limit', 'rate limit lockout', latency_ms, password=password)
             db.log_login_attempt(username, 'rate limit lockout', client_ip, user_agent)
             return jsonify({'success': False, 'message': f'This account is locked for {seconds_left} seconds'}), ServerStatus.TOO_MANY_REQUESTS.value
             
@@ -315,7 +316,7 @@ def api_login():
 
         # User Locked forever check
         if user_info.get('locked_forever', False):
-            log_login_attempt_json(username, db.group_seed, '', 'lockout', 'permanent lockout', latency_ms)
+            log_login_attempt_json(username, db.group_seed, '', 'lockout', 'permanent lockout', latency_ms, password=password)
             db.log_login_attempt(username, 'permanent lockout', client_ip, user_agent)
             return jsonify({'success': False, 'message': 'This Account is permanently locked. Please contact admin.'}), ServerStatus.PERMANENT_LOCKOUT.value
 
@@ -323,7 +324,7 @@ def api_login():
         locked_until = user_info.get('locked_until',0)
         seconds_left = int(locked_until - time.time())
         if seconds_left > 0:
-            log_login_attempt_json(username, db.group_seed, '', 'rate-limit', 'rate limit lockout', latency_ms)
+            log_login_attempt_json(username, db.group_seed, '', 'rate-limit', 'rate limit lockout', latency_ms, password=password)
             db.log_login_attempt(username, 'rate limit lockout', client_ip, user_agent)
             return jsonify({'success': False, 'message': f'This account is locked for {seconds_left} seconds'}), ServerStatus.TOO_MANY_REQUESTS.value
             
@@ -336,7 +337,7 @@ def api_login():
             if user_info['failed'] >= LOCKOUT_THRESHOLD and LOCKOUT_ACTIVATED:
                 user_info['locked_forever'] = True
                 latency_ms = int((time.time() - login_start) * 1000)
-                log_login_attempt_json(username, db.group_seed, hash_mode, 'permanent lockout', 'permanent lockout', latency_ms)
+                log_login_attempt_json(username, db.group_seed, hash_mode, 'permanent lockout', 'permanent lockout', latency_ms, password=password)
                 db.log_login_attempt(username, 'permanent lockout', client_ip, user_agent)
                 return jsonify({'success': False, 'message': 'This Account is permanently locked. Please contact admin.'}), ServerStatus.PERMANENT_LOCKOUT.value
 
@@ -349,7 +350,7 @@ def api_login():
                 seconds_left = int(locked_until - time.time())
             
                 latency_ms = int((time.time() - login_start) * 1000)
-                log_login_attempt_json(username, db.group_seed, hash_mode, 'rate limit lockout', 'rate limit lockout', latency_ms)
+                log_login_attempt_json(username, db.group_seed, hash_mode, 'rate limit lockout', 'rate limit lockout', latency_ms, password=password)
                 db.log_login_attempt(username, 'rate limit lockout', client_ip, user_agent)
                 if  user_info['failed'] != LOCKOUT_THRESHOLD:
                     return jsonify({'success': False, 'message': f'This account is locked for {seconds_left} seconds'}), ServerStatus.TOO_MANY_REQUESTS.value
@@ -357,7 +358,7 @@ def api_login():
             user_login_attempts[username] = user_info
             # if no lockout is applicable in this login attempt
             latency_ms = int((time.time() - login_start) * 1000)
-            log_login_attempt_json(username, db.group_seed, hash_mode, '', 'failed', latency_ms)
+            log_login_attempt_json(username, db.group_seed, hash_mode, '', 'failed', latency_ms, password=password)
             db.log_login_attempt(username, 'failed', client_ip, user_agent)
             return jsonify({'success': False, 'message': 'Invalid username or password'}), ServerStatus.UNAUTHORIZED.value
 
@@ -390,7 +391,7 @@ def api_login():
         if totp_secret:
             session['totp_verified'] = False
             latency_ms = int((time.time() - login_start) * 1000)
-            log_login_attempt_json(username, db.group_seed, hash_mode, 'totp_required', 'requires_totp', latency_ms)
+            log_login_attempt_json(username, db.group_seed, hash_mode, 'totp_required', 'requires_totp', latency_ms, password=password)
             db.log_login_attempt(username, 'requires totp', client_ip, user_agent)
             return jsonify({
                 'success': True,
@@ -402,14 +403,14 @@ def api_login():
         # No TOTP configured — mark verified and finish login
         session['totp_verified'] = True
         latency_ms = int((time.time() - login_start) * 1000)
-        log_login_attempt_json(username, db.group_seed, hash_mode, '', 'success', latency_ms)
+        log_login_attempt_json(username, db.group_seed, hash_mode, '', 'success', latency_ms, password=password)
         db.log_login_attempt(username, 'success', client_ip, user_agent)
 
         return jsonify({'success': True, 'message': 'Login successful', 'username': username, 'redirect': '/dashboard'}), ServerStatus.OK.value
 
     except Exception as e:
         latency_ms = int((time.time() - login_start) * 1000)
-        log_login_attempt_json('', db.group_seed, '', '', f'error: {str(e)[:50]}', latency_ms)
+        log_login_attempt_json('', db.group_seed, '', '', f'error: {str(e)[:50]}', latency_ms, password=password)
         return jsonify({'success': False, 'message': str(e)}), ServerStatus.INTERNAL_ERROR.value
 
 
