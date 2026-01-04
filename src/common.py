@@ -18,3 +18,8 @@ class ServerStatus(Enum):
 
     # Server error
     INTERNAL_ERROR = 500      # Unhandled server error
+
+class HashingAlgorithm(Enum):
+    ARGON2 = 'Argon2'
+    BCRYPT = 'bcrypt'
+    SHA256_SALT = 'SHA-256 + SALT'

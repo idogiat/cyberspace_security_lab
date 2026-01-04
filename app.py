@@ -27,13 +27,11 @@ if __name__ == "__main__":
                    "--type", "weak",
                    "--count", "10",
                    "--host", "http://localhost:5000",
-                   "--enable-totp",
                    "--output", "test_credentials.json"])
     subprocess.run([venv_python, "-m", "automation.test_users_generator", 
                    "--type", "medium",
                    "--count", "10",
                    "--host", "http://localhost:5000",
-                   "--enable-totp",
                    "--output", "test_credentials.json"])
     subprocess.run([venv_python, "-m", "automation.test_users_generator", 
                    "--type", "strong",

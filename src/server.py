@@ -188,7 +188,6 @@ def api_register():
             # if DB raised IntegrityError it bubbles up - return conflict
             return jsonify({'success': False, 'message': str(e)}), ServerStatus.INTERNAL_ERROR.value
 
-        print('before update_json_file')
         update_json_file(username, totp_secret)
 
         return jsonify({
@@ -206,7 +205,7 @@ def api_register():
 def update_json_file(username, totp_secret):
     """updates users.json file with relavent username and their totp secret (or '' if not available)"""
     json_path = os.path.join(os.path.dirname(__file__), 'users.json')
-    print(json_path)
+
     try:
         if not os.path.exists(json_path):
             users_json = {"group_seed": 524392612, "users": []}
@@ -219,7 +218,7 @@ def update_json_file(username, totp_secret):
         })
         with open(json_path, 'w', encoding='utf-8') as f:
             json.dump(users_json, f, ensure_ascii=False, indent=4)
-            print(users_json["users"])
+
     except Exception as e:
         print(f"Failed to update users.json file: {e}")
 
@@ -406,7 +405,7 @@ def api_login():
         log_login_attempt_json(username, db.group_seed, hash_mode, '', 'success', latency_ms)
         db.log_login_attempt(username, 'success', client_ip, user_agent)
 
-        return jsonify({'success': True, 'message': 'Login successful', 'username': username, 'redirect': '/dashboard'}), OK
+        return jsonify({'success': True, 'message': 'Login successful', 'username': username, 'redirect': '/dashboard'}), ServerStatus.OK.value
 
     except Exception as e:
         latency_ms = int((time.time() - login_start) * 1000)
@@ -449,7 +448,7 @@ def verify_totp():
             user_agent = request.headers.get('User-Agent', 'Unknown')
             db.log_login_attempt(username, 'success', client_ip, user_agent)
             
-            return jsonify({'success': True, 'message': 'TOTP verified! Redirecting to dashboard page'}), OK
+            return jsonify({'success': True, 'message': 'TOTP verified! Redirecting to dashboard page'}), ServerStatus.OK.value
         
         else:
             return jsonify({'success': False, 'message': 'Invalid TOTP code. Please check and try again.'}), ServerStatus.UNAUTHORIZED.value
@@ -464,17 +463,17 @@ def api_logout():
     user_agent = request.headers.get('User-Agent', 'Unknown')
     db.log_login_attempt(username, 'logout', client_ip, user_agent)
     session.clear()
-    return jsonify({'success': True, 'message': 'Logged out'}), OK
+    return jsonify({'success': True, 'message': 'Logged out'}), ServerStatus.OK.value
 
 @app.route('/api/health', methods=['GET'])
 def health():
-    return jsonify({'status': 'healthy', 'message': 'Server is running'}), OK
+    return jsonify({'status': 'healthy', 'message': 'Server is running'}), ServerStatus.OK.value
 
 @app.route('/api/user', methods=['GET'])
 def get_user():
     if 'username' not in session:
         return jsonify({'success': False, 'message': 'Not authenticated'}), ServerStatus.UNAUTHORIZED.value
-    return jsonify({'success': True, 'username': session['username']}), OK
+    return jsonify({'success': True, 'username': session['username']}), ServerStatus.OK.value
 
 @app.route('/api/user-details/<username>', methods=['GET'])
 def user_details(username):
@@ -500,7 +499,7 @@ def user_details(username):
                 'totp': user_obj.totp,
                 'pepper': user_obj.pepper
             }
-        }), OK
+        }), ServerStatus.OK.value
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), ServerStatus.INTERNAL_ERROR.value
 
@@ -526,7 +525,7 @@ def get_login_logs():
             }
             for log in logs
         ]
-        return jsonify({'success': True, 'logs': logs_data}), OK
+        return jsonify({'success': True, 'logs': logs_data}), ServerStatus.OK.value
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), ServerStatus.INTERNAL_ERROR.value
 
@@ -555,7 +554,7 @@ def statistics():
             'totalUsers': total_users,
             'successfulLogins': successful_logins,
             'failedLogins': failed_logins
-        }), OK
+        }), ServerStatus.OK.value
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), ServerStatus.INTERNAL_ERROR.value
 
@@ -570,7 +569,7 @@ def get_captcha_token():
     if not token:
         token = secrets.token_hex(16)
         CAPTCHA_TOKENS[username] = token
-    return jsonify({"captcha_token": token}), OK
+    return jsonify({"captcha_token": token}), ServerStatus.OK.value
 
 @app.errorhandler(ServerStatus.NOT_FOUND.value)
 def not_found(error):
