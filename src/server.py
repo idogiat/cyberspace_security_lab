@@ -264,9 +264,7 @@ def api_login():
             'locked_forever': False,
             'rate_limit_failed': 0,
         })
-        print(user_info['failed'])
-        print(user_info['rate_limit_failed'])
-        print(RATE_LIMIT_ACTIVATED)
+
         # User Locked forever check
         if user_info.get('locked_forever', False):
             log_login_attempt_json(username, db.group_seed, '', 'lockout', 'permanent lockout', latency_ms, password=password)

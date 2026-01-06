@@ -3,11 +3,13 @@ import json
 import time
 import os
 import psutil
+import threading
 from typing import List
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
-class BruteForceSimulator():
+class BruteForceSimulator:
     SERVER_URL = 'http://localhost:5000/api/login'
     GROUP_SEED = 524392612
     MAX_ATTEMPTS_PER_USER = 50_000
@@ -15,11 +17,6 @@ class BruteForceSimulator():
     MAX_RUNTIME = 2 * 60 * 60  # 2 hours
 
     def __init__(self, users_file: str, passwords_file: str):
-        """        
-        Parameters:
-            users_file (str): Path to the users.json file
-            passwords_file (str): Path to the common passwords file
-        """
         self.users_file = users_file
         self.passwords_file = passwords_file
 
@@ -27,6 +24,7 @@ class BruteForceSimulator():
         self.passwords = self._load_passwords()
         self.start_time = time.time()
         self.total_attempts = 0
+
         self.summary = {
             "users": {},
             "by_category": defaultdict(list),
@@ -38,12 +36,6 @@ class BruteForceSimulator():
     # ---------- Loaders ----------
 
     def _load_users(self) -> List[str]:
-        """
-        Load users from users.json file into usernames array
-
-        Returns:
-            List[str]: List of usernames
-        """
         with open(self.users_file, "r") as f:
             data = json.load(f)
         return [u["username"] if isinstance(u, dict) else u for u in data.get("users", [])]
@@ -52,7 +44,7 @@ class BruteForceSimulator():
         with open(self.passwords_file, "r") as f:
             return [line.strip() for line in f if line.strip()]
 
-    # ---------- Helpers ---------- #
+    # ---------- Helpers ----------
 
     @staticmethod
     def get_category(username: str) -> str:
@@ -73,10 +65,14 @@ class BruteForceSimulator():
         )
 
     def handle_captcha(self, username: str) -> str:
-        r = requests.get('http://localhost:5000/admin/get_captcha_token', params={"group_seed": self.GROUP_SEED, "username": username})
+        r = requests.get(
+            'http://localhost:5000/admin/get_captcha_token',
+            params={"group_seed": self.GROUP_SEED, "username": username},
+            timeout=5
+        )
         return r.json().get("captcha_token")
 
-    # ---------- Core Logic ---------- #
+    # ---------- Core Logic ----------
 
     def attempt_login(self, payload: dict) -> tuple[dict, float, int]:
         t0 = time.time()
@@ -87,56 +83,80 @@ class BruteForceSimulator():
         except Exception:
             return {}, latency, r.status_code
 
-    def attack_user(self, username: str):
+    def attack_user_multithreaded(self, username: str, num_threads: int = 5):
         category = self.get_category(username)
+
         user_stats = {
+            "username": username,
+            "password_found": None,
             "attempts": 0,
             "cracked": False,
-            "password_found": None,
             "time_to_success": None,
             "latencies": [],
             "totp_stopped": False
         }
 
+        stop_event = threading.Event()
+        stats_lock = threading.Lock()
         user_start = time.time()
-        for password in self.passwords:
-            if self._should_stop():
-                break
+
+        def worker(password: str):
+            if stop_event.is_set():
+                return
 
             payload = {"username": username, "password": password}
             resp, latency, status = self.attempt_login(payload)
-            self._record_attempt(user_stats, latency)
+
+            with stats_lock:
+                self._record_attempt(user_stats, latency)
 
             # CAPTCHA
-            if resp.get("captcha_required"):
+            if resp.get("captcha_required") and not stop_event.is_set():
                 payload["captcha_token"] = self.handle_captcha(username)
                 resp, latency, status = self.attempt_login(payload)
-                self._record_attempt(user_stats, latency)
+                with stats_lock:
+                    self._record_attempt(user_stats, latency)
 
             # Permanent lock
             if status == 423 or "permanently locked" in resp.get("message", "").lower():
-                print(f"[!] User {username} permanently locked after {user_stats['attempts']} attempts")
-                break
+                print(f"[!] User {username} permanently locked")
+                stop_event.set()
+                return
 
-            # TOTP success
+            # TOTP
             if self.is_totp_required(resp):
-                self._mark_success(user_stats, password, user_start, totp=True)
-                print(f"[!] User {username} blocked by TOTP requirement after {user_stats['attempts']} attempts")
-                break
+                with stats_lock:
+                    self._mark_success(user_stats, password, user_start, totp=True)
+                print(f"[!] User {username} blocked by TOTP")
+                stop_event.set()
+                return
 
-            # Full success
+            # Success
             if resp.get("success"):
-                self._mark_success(user_stats, password, user_start)
-                print(f"[+] User {username} cracked! Password: {password}") 
-                break
+                with stats_lock:
+                    self._mark_success(user_stats, password, user_start)
+                print(f"[+] User {username} cracked! Password: {password}")
+                stop_event.set()
+                return
 
             if user_stats["attempts"] >= self.MAX_ATTEMPTS_PER_USER:
-                break
+                stop_event.set()
+
+        with ThreadPoolExecutor(max_workers=num_threads) as executor:
+            futures = []
+            for password in self.passwords:
+                if stop_event.is_set() or self._should_stop():
+                    break
+                futures.append(executor.submit(worker, password))
+
+            for _ in as_completed(futures):
+                if stop_event.is_set():
+                    break
 
         self.summary["users"][username] = user_stats
         self.summary["by_category"][category].append(user_stats)
 
-    # ---------- State Management ---------- #
+    # ---------- State Management ----------
 
     def _record_attempt(self, user_stats, latency):
         self.total_attempts += 1
@@ -150,20 +170,26 @@ class BruteForceSimulator():
         user_stats["password_found"] = password
         user_stats["time_to_success"] = time.time() - start
         user_stats["totp_stopped"] = totp
+        
+        with open("results.txt", "a") as f:
+            f.write(f"{user_stats}\n")
 
     def _should_stop(self) -> bool:
-        return (time.time() - self.start_time > self.MAX_RUNTIME or self.total_attempts >= self.MAX_TOTAL_ATTEMPTS)
+        return (
+            time.time() - self.start_time > self.MAX_RUNTIME or
+            self.total_attempts >= self.MAX_TOTAL_ATTEMPTS
+        )
 
-    # ---------- Execution ---------- #
+    # ---------- Execution ----------
 
-    def run(self):
+    def run(self, threads_per_user: int = 5):
         for user in self.users:
             print(f"\n[Attacking {user}]")
-            self.attack_user(user)
+            self.attack_user_multithreaded(user, threads_per_user)
 
         self.print_summary()
 
-    # ---------- Reporting ----------#
+    # ---------- Reporting ----------
 
     def print_summary(self):
         duration = time.time() - self.start_time
@@ -177,12 +203,15 @@ class BruteForceSimulator():
 
         print(f"\nTotal attempts: {self.total_attempts}")
         print(f"Attempts/sec: {self.total_attempts / duration:.2f}")
-        print(f"Avg CPU: {sum(self.summary['cpu'])/len(self.summary['cpu']):.1f}%")
-        print(f"Avg RAM: {sum(self.summary['mem'])/len(self.summary['mem']):.1f}%")
 
 
 if __name__ == "__main__":
     user_path = os.path.join(os.path.dirname(__file__), "../src/users.json")
-    passwords_path = os.path.join(os.path.dirname(__file__), "../common_10k.txt")
-    sim = BruteForceSimulator(users_file=user_path, passwords_file=passwords_path)
-    sim.run()
+    passwords_path = os.path.join(os.path.dirname(__file__), "../common_passwords.txt")
+
+    sim = BruteForceSimulator(
+        users_file=user_path,
+        passwords_file=passwords_path
+    )
+
+    sim.run(threads_per_user=5)
