@@ -1,15 +1,33 @@
-import requests
-import json
-import time
 import os
+import sys
+import time
+import json
+import signal
 import psutil
+import requests
 import threading
 from typing import List
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from copy import deepcopy
 
+shutdown_event = threading.Event()
 
+def handle_ctrl_c(signum, frame):
+    print("\n[!] Ctrl+C received — shutting down gracefully...")
+    shutdown_event.set()
+
+signal.signal(signal.SIGINT, handle_ctrl_c)
+
+
+def chunkify(lst, n):
+    """Split list lst into n roughly equal chunks"""
+
+    password_list = []
+    size = len(lst) // n
+    for i in range(0, len(lst), size):
+        password_list.append(lst[i:i + size])
+    return password_list
 
 class BruteForceSimulator:
     SERVER_URL = 'http://localhost:5000/api/login'
@@ -88,11 +106,6 @@ class BruteForceSimulator:
         except Exception:
             return {}, latency, r.status_code
     
-    @staticmethod
-    def attack_user_multi_process(args):
-        simulator, username, threads_per_user = args
-        simulator.attack_user_multithreaded(username, threads_per_user)
-    
     def attack_user_multithreaded(self, username: str, num_threads: int = 5):
         category = self.get_category(username)
 
@@ -102,7 +115,6 @@ class BruteForceSimulator:
             "attempts": 0,
             "cracked": False,
             "time_to_success": None,
-            # "latencies": [],
             "latency_sum":0.0,
             "last_latency": None,
             "totp_stopped": False
@@ -117,6 +129,7 @@ class BruteForceSimulator:
                 return
 
             payload = {"username": username, "password": password}
+            print(f"Trying {username}:{password}")
             resp, latency, status = self.attempt_login(payload)
 
             with stats_lock:
@@ -157,14 +170,17 @@ class BruteForceSimulator:
             if user_stats["attempts"] >= self.MAX_ATTEMPTS_PER_USER:
                 stop_event.set()
 
-        with ThreadPoolExecutor(max_workers=num_threads) as executor:
-            futures = []
-            for password in self.passwords:
-                if stop_event.is_set() or self._should_stop():
+        def thread_worker(passwords_chunk: List[str]):
+            for password in passwords_chunk:
+                if stop_event.is_set():
                     break
-                futures.append(executor.submit(worker, password))
+                worker(password)
+    
+        password_chunks = chunkify(self.passwords, num_threads)
+        with ThreadPoolExecutor(max_workers=num_threads) as executor:
+            futures = [executor.submit(thread_worker, chunk) for chunk in password_chunks]
 
-            for _ in as_completed(futures):
+            for fut in as_completed(futures):
                 if stop_event.is_set():
                     break
 
@@ -210,18 +226,8 @@ class BruteForceSimulator:
         users = self.users
         print(f"\n [RUN {users_processes} USERS IN PARALLEL - multiprocessing  {threads_per_user} per user!] \n")
 
-        futures = []
-        results = []
         with ProcessPoolExecutor(max_workers=users_processes) as executor:
-            for user in users:
-                sim_clone = deepcopy(self)
-                args = (sim_clone, user, threads_per_user)
-                futures.append(executor.submit(BruteForceSimulator.attack_user_multi_process, args))
-            # waiting for all processes to end
-            for fut in as_completed(futures):
-                user_stats = fut.result()
-                if user_stats:  
-                    results.append(user_stats)
+            results = executor.map(self.attack_user_multithreaded, users, [threads_per_user]*len(users))
 
         self.total_attempts = sum(u["attempts"] for u in results)
         self.num_cracked = sum(1 for u in results if u["cracked"] and not u["totp_stopped"])
@@ -267,7 +273,7 @@ class BruteForceSimulator:
 
 if __name__ == "__main__":
     user_path = os.path.join(os.path.dirname(__file__), "../src/users.json")
-    passwords_path = os.path.join(os.path.dirname(__file__), "../test_passwords.txt")
+    passwords_path = os.path.join(os.path.dirname(__file__), "../common_passwords.txt")
 
     sim = BruteForceSimulator(
         users_file=user_path,
@@ -275,4 +281,4 @@ if __name__ == "__main__":
     )
     # users_processes = each process will run on a different user
     # threads_per_user = each user will have threads
-    sim.run(threads_per_user = 5,users_processes = 5) 
+    sim.run(threads_per_user = 10, users_processes = 10) 

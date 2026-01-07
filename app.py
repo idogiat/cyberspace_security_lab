@@ -32,7 +32,7 @@ if __name__ == "__main__":
     )
 
     print("=== Starting Server ===")
-    server = subprocess.Popen([venv_python, "src/server.py"])
+    server = subprocess.Popen([venv_python, "src/server.py"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     sleep(3)
 
     if args.gen:
@@ -66,7 +66,7 @@ if __name__ == "__main__":
     if args.attack:
         print("\n=== Running Brute Force Simulator ===")
         subprocess.run([
-            venv_python, "-m", "automation.brute_force_simulator",
+            venv_python, "-m", "automation.multiprocess_password_spraying",
             "--host", "http://localhost:5000",
             "--input", "test_credentials.json"
         ])
