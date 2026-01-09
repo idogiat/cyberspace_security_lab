@@ -39,8 +39,21 @@ pip install -r .\requirements.txt
 
 ## run:
 ```
-python app.py
+python app.py --help
 ```
+output:
+```
+
+$ python ./app.py --help
+usage: app.py [-h] [--gen] [--attack]
+
+options:
+  -h, --help  show this help message and exit
+  --gen       Generate test users
+  --attack    Run brute force simulator
+```
+
+choose your flag and run it accordingly
 
 This will start the server and generate a test dataset with 30 users.
 

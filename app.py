@@ -66,7 +66,7 @@ if __name__ == "__main__":
     if args.attack:
         print("\n=== Running Brute Force Simulator ===")
         subprocess.run([
-            venv_python, "-m", "automation.multiprocess_password_spraying",
+            venv_python, "-m", "automation.brute_force_simulator",
             "--host", "http://localhost:5000",
             "--input", "test_credentials.json"
         ])

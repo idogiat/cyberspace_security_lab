@@ -110,9 +110,13 @@ class BruteForceSimulator():
 
             # CAPTCHA
             if resp.get("captcha_required"):
-                payload["captcha_token"] = self.handle_captcha(username)
-                resp, latency, status = self.attempt_login(payload)
-                self._record_attempt(user_stats, latency)
+                while True:
+                    payload["captcha_token"] = self.handle_captcha(username)
+                    resp, latency, status = self.attempt_login(payload)
+                    self._record_attempt(user_stats, latency)
+                    if resp.get("message") != "Invalid CAPTCHA token":
+                        break
+                    
 
             # Permanent lock
             if status == 423 or "permanently locked" in resp.get("message", "").lower():
@@ -184,6 +188,6 @@ class BruteForceSimulator():
 
 if __name__ == "__main__":
     user_path = os.path.join(os.path.dirname(__file__), "../src/users.json")
-    passwords_path = os.path.join(os.path.dirname(__file__), "../common_10k.txt")
+    passwords_path = os.path.join(os.path.dirname(__file__), "../small_password_register.txt")
     sim = BruteForceSimulator(users_file=user_path, passwords_file=passwords_path)
     sim.run()
