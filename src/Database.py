@@ -247,7 +247,17 @@ class DB:
                 if users_records:
                     users_list = []
                     for row in users_records:
-                        user = Line(*row)
+                        user = Line(
+                            username=row['username'],
+                            password=row['password'],
+                            salt=row['salt'],
+                            hash_mode=row['hash_mode'],
+                            group_seed=row['group_seed'],
+                            metadata=row['metadata'],
+                            created_at=row['created_at'],
+                            totp=row['totp'],
+                            pepper=row['pepper']
+)
                         users_list.append(user)
                     return users_list
                 else:
