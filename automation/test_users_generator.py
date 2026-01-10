@@ -1,14 +1,9 @@
 #!/usr/bin/env python3
-"""Generate test users by calling the app's /api/register endpoint and save credentials.
-
-Usage:
-    python test_users_generator.py --count 200 --host http://localhost:5000
-    python test_users_generator.py --dataset weak medium strong --host http://localhost:5000
-
-Notes:
-- Run against your local/dev server only.
-- Use --dataset to generate users with weak/medium/strong passwords for security testing.
 """
+Generate test users by calling the app's /api/register endpoint and save credentials.
+Also generates finite password wordlists for demo brute-force attacks.
+"""
+
 import os
 import json
 import time
@@ -17,157 +12,231 @@ import random
 import string
 import requests
 import argparse
-from functools import partial
+from pathlib import Path
 
 from src.common import ServerStatus, HashingAlgorithm
 
-# Password strength generators for security testing
-get_randint = partial(random.randint, 0, 10)
-pswd_file = os.path.join(os.path.dirname(__file__), '../common_passwords.txt')
+# =========================
+# CONSTANTS
+# =========================
 
-def weak_password_generator() -> str:
-    """Generate weak passwords - easily compromised via brute force.
-    Examples: 123456, password, qwerty, admin, letmein, etc.
+MAX_WEAK   = 5_000
+MAX_MEDIUM = 10_000
+MAX_STRONG = 50_000
+
+BASE_DIR = Path(os.path.dirname(__file__))
+
+WEAK_FILE   = BASE_DIR / "passwords_weak.txt"
+MEDIUM_FILE = BASE_DIR / "passwords_medium.txt"
+STRONG_FILE = BASE_DIR / "passwords_strong.txt"
+
+SPECIALS = ["!", "@", "#", "$", "%"]
+
+# =========================
+# PASSWORD LIST GENERATORS
+# =========================
+
+def generate_weak_list():
     """
-    with open (pswd_file, 'r', encoding='utf-8') as f:
-        patterns = [line.strip() for line in f if line.strip()]
-    return random.choice(patterns)
+    VERY weak – looks like real bad human passwords.
+    """
+    common = [
+        "123456", "111111", "123123", "password", "password1",
+        "qwerty", "qwerty123", "admin", "admin123",
+        "welcome", "letmein", "iloveyou", "pass123"
+    ]
+
+    pwds = set(common)
+
+    bases = ["pass", "admin", "test", "user", "login"]
+    while len(pwds) < MAX_WEAK:
+        base = random.choice(bases)
+        num = random.randint(0, 999)
+        pwds.add(f"{base}{num}")
+        pwds.add(f"{base.capitalize()}{num}")
+
+    return list(pwds)
+
+
+def generate_medium_list():
+    """
+    Medium – reasonable, common patterns people believe are strong.
+    Letters + numbers, sometimes mixed case, no real entropy.
+    """
+    words = [
+        "Sun", "Moon", "Fire", "Stone", "Sky",
+        "River", "Shadow", "Light", "Iron", "Wolf"
+    ]
+
+    pwds = set()
+
+    while len(pwds) < MAX_MEDIUM:
+        w = random.choice(words)
+        num = random.randint(10, 9999)
+
+        pwds.add(f"{w}{num}")
+        pwds.add(f"{w.lower()}{num}")
+        pwds.add(f"{w}{num}A")
+        pwds.add(f"{w.capitalize()}{num}Z")
+
+    return list(pwds)
+
+
+def generate_strong_list():
+    """
+    Strong – looks truly random, but finite and crackable.
+    """
+    pwds = set()
+
+    alphabet = string.ascii_letters + string.digits + "".join(SPECIALS)
+
+    while len(pwds) < MAX_STRONG:
+        length = random.randint(10, 14)
+        pwd = "".join(random.choice(alphabet) for _ in range(length))
+
+        # enforce at least: lower, upper, digit, special
+        if (
+            any(c.islower() for c in pwd) and
+            any(c.isupper() for c in pwd) and
+            any(c.isdigit() for c in pwd) and
+            any(c in SPECIALS for c in pwd)
+        ):
+            pwds.add(pwd)
+
+    return list(pwds)
+
+
+# =========================
+# LOAD OR GENERATE LISTS
+# =========================
+
+def load_or_generate(path: Path, generator):
+    if path.exists():
+        with open(path, "r", encoding="utf-8") as f:
+            return [l.strip() for l in f if l.strip()]
+
+    pwds = generator()
+    with open(path, "w", encoding="utf-8") as f:
+        for p in pwds:
+            f.write(p + "\n")
+    return pwds
+
+
+WEAK_PASSWORDS   = load_or_generate(WEAK_FILE, generate_weak_list)
+MEDIUM_PASSWORDS = load_or_generate(MEDIUM_FILE, generate_medium_list)
+STRONG_PASSWORDS = load_or_generate(STRONG_FILE, generate_strong_list)
+
+# =========================
+# PASSWORD PICKERS
+# =========================
+
+def weak_password_generator():
+    return random.choice(WEAK_PASSWORDS)
 
 def medium_password_generator():
-    """Generate medium strength passwords - moderate complexity.
-    Mix of uppercase, lowercase, numbers, occasional special chars.
-    """
-    months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-    days = ['01', '15', '31', '05', '20', '10', '25', '30', '12', '07']
-    patterns = [
-        f"Pass{get_randint():02d}Word",  # Pass00Word, Pass01Word...
-        f"Secure{get_randint():03d}",  # Secure000, Secure001...
-        f"User{2020 + (get_randint() % 5)}",  # User2020, User2021...
-        f"{months[get_randint() % 12]}Pass{get_randint():02d}",  # JanPass00, FebPass01...
-        f"Demo{get_randint():02d}@Test",  # Demo00@Test, Demo01@Test...
-        f"Key{get_randint():04d}Code",  # Key0000Code, Key0001Code...
-        f"Admin{days[get_randint() % 10]}",  # Admin01, Admin15...
-        f"Login{get_randint():02d}$",  # Login00$, Login01$...
-        f"Access{get_randint():03d}Key",  # Access000Key, Access001Key...
-        f"Data{2024 - (get_randint() % 5)}{chr(65 + (get_randint() % 26))}",  # Data2024A, Data2023B...
-    ]
-    
-    return random.choice(patterns)
-
+    return random.choice(MEDIUM_PASSWORDS)
 
 def strong_password_generator():
-    """Generate strong passwords - high complexity with special chars, mixed case.
-    Multiple special chars, numbers in different positions, long length.
-    """
-    special_chars = ['!', '@', '#', '$', '%', '&', '*', '+', '-', '=']
-    patterns = [
-        f"C0mp{special_chars[get_randint() % len(special_chars)]}Secure{get_randint():03d}{special_chars[(get_randint() + 1) % len(special_chars)]}Key",
-        f"{special_chars[get_randint() % len(special_chars)]}MyP@ssw0rd{get_randint():04d}{special_chars[(get_randint() + 2) % len(special_chars)]}",
-        f"P@ss{chr(65 + (get_randint() % 26))}{get_randint():05d}{special_chars[(get_randint() + 3) % len(special_chars)]}Secure",
-        f"Str0ng{special_chars[get_randint() % len(special_chars)]}{chr(97 + (get_randint() % 26))}{get_randint():04d}{special_chars[(get_randint() + 1) % len(special_chars)]}",
-        f"{get_randint():03d}Key{special_chars[get_randint() % len(special_chars)]}{chr(65 + ((get_randint() + 5) % 26))}{special_chars[(get_randint() + 2) % len(special_chars)]}Pwd",
-        f"Adv@nced{special_chars[(get_randint() + 1) % len(special_chars)]}{get_randint():05d}{chr(97 + ((get_randint() + 10) % 26))}{special_chars[get_randint() % len(special_chars)]}",
-        f"C{special_chars[get_randint() % len(special_chars)]}mpl3x{get_randint():04d}{special_chars[(get_randint() + 2) % len(special_chars)]}{chr(65 + (get_randint() % 26))}S3cur3",
-        f"M@ster{chr(97 + (get_randint() % 26))}{get_randint():04d}{special_chars[get_randint() % len(special_chars)]}{special_chars[(get_randint() + 1) % len(special_chars)]}Key",
-        f"R0bUst{special_chars[(get_randint() + 3) % len(special_chars)]}{get_randint():05d}{chr(65 + ((get_randint() + 7) % 26))}{special_chars[get_randint() % len(special_chars)]}",
-        f"{special_chars[get_randint() % len(special_chars)]}P@ssP{chr(65 + (get_randint() % 26))}{get_randint():05d}{special_chars[(get_randint() + 1) % len(special_chars)]}{chr(97 + ((get_randint() + 12) % 26))}",
-    ]
-    return random.choice(patterns)
+    return random.choice(STRONG_PASSWORDS)
+
+# =========================
+# USERNAME GENERATOR (UNCHANGED)
+# =========================
 
 def gen_username(i=None, prefix='loaduser', randomize=False, length=6):
-    """Generate a username. If randomize=True, create a random suffix; otherwise use numeric index."""
     if randomize:
         suffix = ''.join(random.choices(string.ascii_lowercase + string.digits, k=length))
         return f"{prefix}_{suffix}"
-    else:
-        return f"{prefix}{i}"
+    return f"{prefix}{i}"
 
+# =========================
+# MAIN FLOW (UNCHANGED)
+# =========================
 
 def generate_users():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--count", type=int, default=10, help="Number of test users to create")
-    parser.add_argument("--host", type=str, default="http://localhost:5000", help="Server base URL")
-    parser.add_argument("--password", type=str, default=None, help="Password for all test users (overrides --dataset)")
-    parser.add_argument("--delay", type=float, default=0.05, help="Delay between register requests (seconds)")
-    parser.add_argument("--random", action='store_true', help="Use randomized usernames to avoid collisions")
-    parser.add_argument("--random-length", type=int, default=6, help="Random suffix length when --random is used")
-    parser.add_argument("--prefix", type=str, default='loaduser', help="Username prefix")
-    parser.add_argument("--max-retries", type=int, default=5, help="Max retries when username exists")
-    parser.add_argument("--enable-totp", action='store_true', help="Enable TOTP for generated users")
-    parser.add_argument("--output", type=str, default="test_credentials.json", help="Output file for credentials")
-    parser.add_argument("--type", type=str, help="Create user with passwort type weak/medium/strong passwords (e.g. weak medium strong)")
+
+    parser.add_argument("--count", type=int, default=10)
+    parser.add_argument("--host", type=str, default="http://localhost:5000")
+    parser.add_argument("--password", type=str, default=None)
+    parser.add_argument("--delay", type=float, default=0.05)
+    parser.add_argument("--random", action='store_true')
+    parser.add_argument("--random-length", type=int, default=6)
+    parser.add_argument("--prefix", type=str, default='loaduser')
+    parser.add_argument("--max-retries", type=int, default=5)
+    parser.add_argument("--enable-totp", action='store_true')
+    parser.add_argument("--output", type=str, default="test_credentials.json")
+    parser.add_argument("--type", type=str)
+
     args = parser.parse_args()
 
     creds = []
-    print(f"Dataset mode: Creating {args.type} passwords for {args.count} users")
     counter = 1
     use_pepper = False
+
+    print(f"Creating {args.count} users of type {args.type}")
+
     while counter <= args.count:
-        if args.type == 'weak':
-            password_gen = weak_password_generator()
+        if args.password:
+            password = args.password
+        elif args.type == "weak":
+            password = weak_password_generator()
             use_pepper = False
-        elif args.type == 'medium':
-            password_gen = medium_password_generator()
-            use_pepper ^= True 
-        elif args.type == 'strong':
-            password_gen = strong_password_generator()
+        elif args.type == "medium":
+            password = medium_password_generator()
+            use_pepper ^= True
+        elif args.type == "strong":
+            password = strong_password_generator()
             use_pepper = True
         else:
-            print(f"Unknown password type: {args.type}")
-            continue
-        
+            print("Unknown password type")
+            return
+
         username = f"{args.prefix}_{args.type}_{counter}"
-            
-        totp_secret = ''
-        if args.enable_totp:
-            totp_secret = pyotp.random_base32()
-        
-        hash_mode_index = counter % len(HashingAlgorithm)
-        hash_mode = (list(HashingAlgorithm)[hash_mode_index]).value
+        totp_secret = pyotp.random_base32() if args.enable_totp else None
+        hash_mode = list(HashingAlgorithm)[counter % len(HashingAlgorithm)].value
 
         payload = {
             "username": username,
-            "password": password_gen,
+            "password": password,
             "hash_mode": hash_mode,
             "use_totp": args.enable_totp,
             "use_pepper": use_pepper
         }
-        
+
         if totp_secret:
             payload["totp_secret"] = totp_secret
-        
+
         try:
             r = requests.post(f"{args.host}/api/register", json=payload, timeout=10)
-            status = r.status_code
-            print(f"attempt {counter} -> {username} ({args.type}) -> {status}")
-            if status in (ServerStatus.OK.value, ServerStatus.CREATED.value):
-                cred = {"username": username, "password": password_gen, "strength": args.type}
+            print(f"attempt {counter} -> {username} -> {r.status_code}")
+
+            if r.status_code in (ServerStatus.OK.value, ServerStatus.CREATED.value):
+                entry = {"username": username, "password": password, "strength": args.type}
                 if totp_secret:
-                    cred["totp_secret"] = totp_secret
-                creds.append(cred)
+                    entry["totp_secret"] = totp_secret
+                creds.append(entry)
                 counter += 1
+            elif r.status_code == ServerStatus.CONFLICT.value:
+                counter += 1
+                args.count += 1
             else:
-                if status == ServerStatus.CONFLICT.value:
-                    print(f" username {username} already exists, skipping.")
-                    counter += 1
-                    args.count += 1
-                else:
-                    print(f"Registration failed: {r.status_code} {r.text}")
-        
+                print(f"Registration failed: {r.text}")
+
         except Exception as e:
-            print(f'  error: {e}')
+            print(f"error: {e}")
             time.sleep(args.delay)
-    
-    # Save credentials to file
-    exists_users = []
+
+    existing = []
     if os.path.exists(args.output):
-        with open(args.output, 'r', encoding='utf-8') as f:
-            exists_users = json.load(f)
+        with open(args.output, "r", encoding="utf-8") as f:
+            existing = json.load(f)
 
-    with open(args.output, 'w', encoding='utf-8') as f:
-        json.dump(exists_users + creds, f, indent=4, ensure_ascii=False)
-    print(f"\nCredentials saved to {args.output} ({len(creds)} users)")
+    with open(args.output, "w", encoding="utf-8") as f:
+        json.dump(existing + creds, f, indent=4)
+
+    print(f"Saved {len(creds)} users to {args.output}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     generate_users()
