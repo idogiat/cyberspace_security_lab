@@ -6,12 +6,12 @@ import signal
 import psutil
 import requests
 import threading
+import pandas
 from typing import List
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from copy import deepcopy
-<<<<<<< HEAD
-=======
+
 
 shutdown_event = threading.Event()
 print_lock = threading.Lock()   # ✅ חדש – למניעת ערבוב prints
@@ -23,23 +23,8 @@ def handle_ctrl_c(signum, frame):
 
 signal.signal(signal.SIGINT, handle_ctrl_c)
 
-# ---------- HELPERS ----------
-def chunkify(lst, n):
-    """Split list lst into n roughly equal chunks (SAFE)"""
-    if n <= 0:
-        return [lst]
-    n = min(n, len(lst))
-    size = (len(lst) + n - 1) // n
-    return [lst[i:i + size] for i in range(0, len(lst), size)]
->>>>>>> 15a9316c78cb92136c60c807f27868f260c46cb7
 
-shutdown_event = threading.Event()
 
-def handle_ctrl_c(signum, frame):
-    print("\n[!] Ctrl+C received — shutting down gracefully...")
-    shutdown_event.set()
-
-signal.signal(signal.SIGINT, handle_ctrl_c)
 
 
 def chunkify(lst, n):
@@ -82,17 +67,10 @@ class BruteForceSimulator:
         self.passwords_by_category = self._load_passwords()
         self.start_time = time.time()
         self.total_attempts = 0
-<<<<<<< HEAD
         self.time_to_first_success = None    # Time till first crack
         self.num_users = len(self.users)  # total user count
         self.num_cracked = 0              # cracked users
         self.global_latency = 0.0 # for avg latency calculate
-=======
-        self.time_to_first_success = None
-        self.num_users = len(self.users)
-        self.num_cracked = 0
-        self.global_latency = 0.0
->>>>>>> 15a9316c78cb92136c60c807f27868f260c46cb7
         self.summary = {
             "users": {},
             "by_category": defaultdict(list),
@@ -167,7 +145,6 @@ class BruteForceSimulator:
             "attempts": 0,
             "cracked": False,
             "time_to_success": None,
-<<<<<<< HEAD
             "latency_sum":0.0,
             "last_latency": None,
             "totp_stopped": False,
@@ -176,11 +153,6 @@ class BruteForceSimulator:
             "cpu_count": 0,
             "mem_sum": 0.0,
             "mem_count": 0,
-=======
-            "latency_sum": 0.0,
-            "last_latency": None,
-            "totp_stopped": False
->>>>>>> 15a9316c78cb92136c60c807f27868f260c46cb7
         }
 
         stop_event = threading.Event()
@@ -228,15 +200,10 @@ class BruteForceSimulator:
             if resp.get("success"):
                 with stats_lock:
                     self._mark_success(user_stats, password, user_start)
-<<<<<<< HEAD
                     if "absolute_first_success" not in user_stats or not user_stats["absolute_first_success"]:
                         user_stats["absolute_first_success"] = time.time()
                     # self.num_cracked += 1
                 print(f"[+] User {username} cracked! Password: {password}")
-=======
-                    if self.time_to_first_success is None:
-                        self.time_to_first_success = time.time() - self.start_time
->>>>>>> 15a9316c78cb92136c60c807f27868f260c46cb7
                 stop_event.set()
                 return
 
@@ -244,22 +211,6 @@ class BruteForceSimulator:
                 stop_event.set()
 
         def thread_worker(passwords_chunk: List[str]):
-<<<<<<< HEAD
-            # print(f"Thread {threading.current_thread().name} got chunk (len={len(passwords_chunk)}): {passwords_chunk[:5]} ... {passwords_chunk[-5:]}")
-            for password in passwords_chunk:
-                if stop_event.is_set():
-                    break
-                worker(password)
-    
-        password_chunks = chunkify(self.passwords, num_threads)
-        # for i, chunk in enumerate(password_chunks):
-            # print(f"Chunk {i}: first 5={chunk[:5]}, last 5={chunk[-5:]}, length={len(chunk)}")
-        with ThreadPoolExecutor(max_workers=num_threads) as executor:
-            futures = [executor.submit(thread_worker, chunk) for chunk in password_chunks]
-
-            for fut in as_completed(futures):
-                if stop_event.is_set():
-=======
             for password in passwords_chunk:
                 if stop_event.is_set() or shutdown_event.is_set():
                     break
@@ -270,18 +221,12 @@ class BruteForceSimulator:
             futures = [executor.submit(thread_worker, chunk) for chunk in password_chunks]
             for _ in as_completed(futures):
                 if stop_event.is_set() or shutdown_event.is_set():
->>>>>>> 15a9316c78cb92136c60c807f27868f260c46cb7
                     break
 
         self.summary["users"][username] = user_stats
         self.summary["by_category"][category].append(user_stats)
 
         return user_stats
-<<<<<<< HEAD
-
-    # ---------- State Management ----------
-=======
->>>>>>> 15a9316c78cb92136c60c807f27868f260c46cb7
 
     # ---------- State Management ----------
     def _record_attempt(self, user_stats, latency):
@@ -289,9 +234,6 @@ class BruteForceSimulator:
         user_stats["attempts"] += 1
         user_stats["latency_sum"] += latency
         user_stats["last_latency"] = latency
-<<<<<<< HEAD
-        # self.summary["cpu"].append(psutil.cpu_percent())
-        # self.summary["mem"].append(psutil.virtual_memory().percent)
         cpu_now = psutil.cpu_percent()
         mem_now = psutil.virtual_memory().percent
         user_stats["cpu_sum"] += cpu_now
@@ -301,11 +243,6 @@ class BruteForceSimulator:
         self.global_latency += latency
 
 
-=======
-        self.summary["cpu"].append(psutil.cpu_percent())
-        self.summary["mem"].append(psutil.virtual_memory().percent)
-        self.global_latency += latency
->>>>>>> 15a9316c78cb92136c60c807f27868f260c46cb7
 
     def _mark_success(self, user_stats, password, start, totp=False):
         user_stats["cracked"] = True
@@ -314,14 +251,11 @@ class BruteForceSimulator:
         user_stats["absolute_first_success"] = time.time()
         user_stats["totp_stopped"] = totp
 
-<<<<<<< HEAD
         if not totp:
             self.num_cracked += 1 # saved as cracked only if it's not defended by totp
             if self.time_to_first_success is None:
                 self.time_to_first_success = user_stats["time_to_success"]
 
-=======
->>>>>>> 15a9316c78cb92136c60c807f27868f260c46cb7
         with open("results.txt", "a") as f:
             f.write(f"{user_stats}\n")
 
@@ -332,31 +266,11 @@ class BruteForceSimulator:
         )
 
     # ---------- Execution ----------
-    def run(self, threads_per_user: int = 5, users_processes=5):
-        users = self.users
-        print(f"\n [RUN {users_processes} USERS IN PARALLEL - multiprocessing  {threads_per_user} per user!] \n")
 
-<<<<<<< HEAD
     def run(self, threads_per_user: int = 5, users_processes = 5):
         users = self.users
         print(f"\n [RUN {users_processes} USERS IN PARALLEL - multiprocessing  {threads_per_user} per user!] \n")
-=======
-        with ProcessPoolExecutor(max_workers=users_processes) as executor:
-            results = list(executor.map(self.attack_user_multithreaded, users,[threads_per_user]*len(users)))
-
-        self.total_attempts = sum(u["attempts"] for u in results)
-        self.num_cracked = sum(1 for u in results if u["cracked"] and not u["totp_stopped"])
-        self.time_to_first_success = min(
-            [u["time_to_success"] for u in results if u["cracked"] and u["time_to_success"]],
-            default=None
-        )
-        self.global_latency = sum(u["latency_sum"] for u in results)
-
-        for u in results:
-            cat = self.get_category(u["username"])
-            self.summary["by_category"][cat].append(u)
->>>>>>> 15a9316c78cb92136c60c807f27868f260c46cb7
-
+    
         with ProcessPoolExecutor(max_workers=users_processes) as executor:
             results = list(executor.map(self.attack_user_multithreaded, users, [threads_per_user]*len(users)))
 
@@ -365,9 +279,10 @@ class BruteForceSimulator:
         self.time_to_first_success = min([u["time_to_success"] for u in results if u["cracked"] and u["time_to_success"]], default=None)
         self.global_latency = sum(u["latency_sum"] for u in results)
 
-        absolute_success_times = [u["absolute_first_success"]
-        for u in results if u["cracked"] and not u["totp_stopped"] and u.get("absolute_first_success")
-    ]
+        absolute_success_times = [
+            u["absolute_first_success"]
+            for u in results if u["cracked"] and not u["totp_stopped"] and u.get("absolute_first_success")
+        ]
 
         if absolute_success_times:
             self.time_to_first_success = min(absolute_success_times) - self.start_time
@@ -379,10 +294,10 @@ class BruteForceSimulator:
         for u in results:
             cat = self.get_category(u["username"])
             self.summary["by_category"][cat].append(u)
-        if u["cpu_count"]:
-            cpu_vals.append(u["cpu_sum"] / u["cpu_count"])
-        if u["mem_count"]:
-            mem_vals.append(u["mem_sum"] / u["mem_count"])
+            if u["cpu_count"]:
+                cpu_vals.append(u["cpu_sum"] / u["cpu_count"])
+            if u["mem_count"]:
+                mem_vals.append(u["mem_sum"] / u["mem_count"])
     
         self.avg_cpu = sum(cpu_vals) / len(cpu_vals) if cpu_vals else 0
         self.avg_mem = sum(mem_vals) / len(mem_vals) if mem_vals else 0
@@ -393,13 +308,24 @@ class BruteForceSimulator:
     # ---------- Reporting ----------
     def print_summary(self):
         duration = time.time() - self.start_time
+        summary_data = []
+
         print("\n========== SUMMARY ==========")
 
+        total_totp_blocked = 0
         for cat in ["weak", "medium", "strong"]:
             users = self.summary["by_category"][cat]
             cracked = sum(1 for u in users if u["cracked"] and not u["totp_stopped"])
             totp = sum(1 for u in users if u["totp_stopped"])
+            total_totp_blocked += totp
             print(f"{cat}: cracked={cracked}, totp_blocked={totp}, total={len(users)}")
+            entry = {
+            "Category": cat,
+            "Cracked": cracked,
+            "TOTP Blocked": totp,
+            "Total": len(users)
+            }
+            summary_data.append(entry)
 
 
         print(f"\nTotal attempts: {self.total_attempts}")
@@ -434,6 +360,27 @@ class BruteForceSimulator:
         if self.summary["mem"]:
             print(f"Avg RAM: {sum(self.summary['mem'])/len(self.summary['mem']):.1f}%")
 
+        summary_row = {
+            "attack duration": duration,
+            "Total attempts": self.total_attempts,
+            "Total successes": self.num_cracked,
+            "Total TOTP blocked": total_totp_blocked,
+            "Attempts per second": self.total_attempts / duration if duration > 0 else 0,
+            "Time to first success": self.time_to_first_success if self.time_to_first_success else None,
+            "Success rate (%)": self.num_cracked / self.num_users * 100 if self.num_users else 0,
+            "Avg latency (ms)": (self.global_latency / self.total_attempts) if self.global_latency else None,
+            "Avg CPU (%)": self.avg_cpu,
+            "Avg RAM (%)": self.avg_mem
+        }
+
+        df = pandas.DataFrame(summary_data)
+        total_df = pandas.DataFrame([summary_row])
+        with pandas.ExcelWriter("brute_force_summary.xlsx") as writer:
+            df.to_excel(writer, sheet_name='Per Category', index=False)
+            total_df.to_excel(writer, sheet_name='Totals', index=False)
+        print("[✓] brute_force_summary.xlsx written!")
+
+
 
 if __name__ == "__main__":
     base_dir = os.path.dirname(__file__)
@@ -441,6 +388,7 @@ if __name__ == "__main__":
     weak_path = os.path.join(base_dir, "passwords_weak.txt")
     medium_path = os.path.join(base_dir, "passwords_medium.txt")
     strong_path = os.path.join(base_dir, "passwords_strong.txt")
+    
 
     sim = BruteForceSimulator(
         users_file=user_path,
@@ -448,11 +396,6 @@ if __name__ == "__main__":
         medium_file=medium_path,
         strong_file=strong_path
     )
-<<<<<<< HEAD
     # users_processes = each process will run on a different user
     # threads_per_user = each user will have threads
     sim.run(threads_per_user = 10, users_processes = 10) 
-=======
-
-    sim.run(threads_per_user=10, users_processes=10)
->>>>>>> 15a9316c78cb92136c60c807f27868f260c46cb7

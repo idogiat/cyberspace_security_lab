@@ -20,6 +20,11 @@ from src.common import ServerStatus, HashingAlgorithm
 # CONSTANTS
 # =========================
 
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), '../src/config.json')
+with open(CONFIG_PATH, 'r') as f:
+    CONFIG = json.load(f)
+HASH_MODE = CONFIG.get('AUTOMATION_GEN_USERS_HASH_MODE', 1)
+
 MAX_WEAK   = 5_000
 MAX_MEDIUM = 10_000
 MAX_STRONG = 50_000
@@ -194,8 +199,9 @@ def generate_users():
 
         username = f"{args.prefix}_{args.type}_{counter}"
         totp_secret = pyotp.random_base32() if args.enable_totp else None
-        hash_mode = list(HashingAlgorithm)[counter % len(HashingAlgorithm)].value
-
+        # hash_mode = list(HashingAlgorithm)[counter % len(HashingAlgorithm)].value
+        # defined in hash mode
+        hash_mode = list(HashingAlgorithm)[HASH_MODE].value
         payload = {
             "username": username,
             "password": password,
@@ -237,6 +243,28 @@ def generate_users():
 
     print(f"Saved {len(creds)} users to {args.output}")
 
+    
+def generate_combined_passwords(out_file="combined_passwords.txt"):
+    with open(WEAK_FILE, encoding="utf-8") as f:
+        weak_pwds = [line.strip() for line in f if line.strip()]
+    with open(MEDIUM_FILE, encoding="utf-8") as f:
+        medium_pwds = [line.strip() for line in f if line.strip()]
+    with open(STRONG_FILE, encoding="utf-8") as f:
+        strong_pwds = [line.strip() for line in f if line.strip()]
+
+    weak_part = random.sample(weak_pwds, 1667)
+    medium_part = random.sample(medium_pwds, 1667)
+    strong_part = random.sample(strong_pwds, 1666)
+
+    all_pwds = weak_part + medium_part + strong_part
+    random.shuffle(all_pwds)
+
+    outpath = BASE_DIR / out_file
+    with open(outpath, "w", encoding="utf-8") as f:
+        for p in all_pwds:
+            f.write(p + "\n")
+    print(f"Combined password file written to: {outpath}")
 
 if __name__ == "__main__":
     generate_users()
+    generate_combined_passwords()

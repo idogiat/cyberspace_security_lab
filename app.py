@@ -21,7 +21,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--gen", action="store_true", help="Generate test users")
-    parser.add_argument("--attack", action="store_true", help="Run brute force simulator")
+    parser.add_argument("--BF_attack", action="store_true", help="Run brute force simulator")
+    parser.add_argument("--PS_attack", action="store_true", help="Run password spray simulator")
     args = parser.parse_args()
 
     venv_python = os.path.join(
@@ -63,10 +64,17 @@ if __name__ == "__main__":
             "--output", "test_credentials.json"
         ])
 
-    if args.attack:
+    if args.BF_attack:
         print("\n=== Running Brute Force Simulator ===")
         subprocess.run([
             venv_python, "-m", "automation.brute_force_simulator",
+            "--host", "http://localhost:5000",
+            "--input", "test_credentials.json"
+        ])
+    if args.PS_attack:
+        print("\n=== Running password spray Simulator ===")
+        subprocess.run([
+            venv_python, "-m", "automation.password_spraying_simulator",
             "--host", "http://localhost:5000",
             "--input", "test_credentials.json"
         ])

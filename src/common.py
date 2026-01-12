@@ -19,7 +19,8 @@ class ServerStatus(Enum):
     # Server error
     INTERNAL_ERROR = 500      # Unhandled server error
 
+# used for automation/test_users_generator.py and config.json
 class HashingAlgorithm(Enum):
-    ARGON2 = 'Argon2'
-    BCRYPT = 'bcrypt'
-    SHA256_SALT = 'SHA-256 + SALT'
+    ARGON2 = 'Argon2' # 0
+    BCRYPT = 'bcrypt' # 1
+    SHA256_SALT = 'SHA-256 + SALT' # 2
