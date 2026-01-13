@@ -155,6 +155,30 @@ def gen_username(i=None, prefix='loaduser', randomize=False, length=6):
         return f"{prefix}_{suffix}"
     return f"{prefix}{i}"
 
+
+def generate_combined_passwords(out_file="combined_passwords.txt"):
+    with open(WEAK_FILE, encoding="utf-8") as f:
+        weak_pwds = [line.strip() for line in f if line.strip()]
+    with open(MEDIUM_FILE, encoding="utf-8") as f:
+        medium_pwds = [line.strip() for line in f if line.strip()]
+    with open(STRONG_FILE, encoding="utf-8") as f:
+        strong_pwds = [line.strip() for line in f if line.strip()]
+
+    weak_part = random.sample(weak_pwds, 1667)
+    medium_part = random.sample(medium_pwds, 1667)
+    strong_part = random.sample(strong_pwds, 1666)
+
+    all_pwds = weak_part + medium_part + strong_part
+    random.shuffle(all_pwds)
+
+    outpath = BASE_DIR / out_file
+    with open(outpath, "w", encoding="utf-8") as f:
+        for p in all_pwds:
+            f.write(p + "\n")
+    print(f"Combined password file written to: {outpath}")
+
+
+
 # =========================
 # MAIN FLOW (UNCHANGED)
 # =========================
@@ -173,8 +197,13 @@ def generate_users():
     parser.add_argument("--enable-totp", action='store_true')
     parser.add_argument("--output", type=str, default="test_credentials.json")
     parser.add_argument("--type", type=str)
+    parser.add_argument("--password_spraying", action='store_true')
 
     args = parser.parse_args()
+
+    if args.password_spraying:
+        generate_combined_passwords()
+        exit(0)
 
     creds = []
     counter = 1
@@ -242,8 +271,6 @@ def generate_users():
         json.dump(existing + creds, f, indent=4)
 
     print(f"Saved {len(creds)} users to {args.output}")
-
-    
 
 if __name__ == "__main__":
     generate_users()

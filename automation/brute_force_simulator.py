@@ -1,5 +1,4 @@
 import os
-import sys
 import time
 import json
 import signal
@@ -10,11 +9,10 @@ import pandas
 from typing import List
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
-from copy import deepcopy
 
 
 shutdown_event = threading.Event()
-print_lock = threading.Lock()   # ✅ חדש – למניעת ערבוב prints
+print_lock = threading.Lock()
 
 # ---------- CTRL+C ----------
 def handle_ctrl_c(signum, frame):
@@ -22,9 +20,6 @@ def handle_ctrl_c(signum, frame):
     shutdown_event.set()
 
 signal.signal(signal.SIGINT, handle_ctrl_c)
-
-
-
 
 
 def chunkify(lst, n):
