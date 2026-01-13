@@ -1,0 +1,80 @@
+{
+
+    "no_defence": {
+        "AUTOMATION_GEN_USERS_HASH_MODE":0,
+        "AUTOMATION_GEN_USERS_TOTP":false,
+        "LOCKOUT_ACTIVATED":false,
+        "LOCKOUT_THRESHOLD": 45,
+        "RATE_LIMIT_ACTIVATED":false,
+        "RATE_LIMIT_ATTEMPTS": 10,
+        "RATE_LIMIT_LOCK_SEC": 60,
+        "CAPTCHA_ACTIVATED":false,
+        "CAPTCHA_THRESHOLD":20
+    },
+    "captcha_only": {
+        "AUTOMATION_GEN_USERS_HASH_MODE":0,
+        "AUTOMATION_GEN_USERS_TOTP":false,
+        "LOCKOUT_ACTIVATED":false,
+        "LOCKOUT_THRESHOLD": 45,
+        "RATE_LIMIT_ACTIVATED":false,
+        "RATE_LIMIT_ATTEMPTS": 10,
+        "RATE_LIMIT_LOCK_SEC": 60,
+        "CAPTCHA_ACTIVATED":true,
+        "CAPTCHA_THRESHOLD":20
+    },
+    "rate_limit_only": {
+        "AUTOMATION_GEN_USERS_HASH_MODE":0,
+        "AUTOMATION_GEN_USERS_TOTP":false,
+        "LOCKOUT_ACTIVATED":false,
+        "LOCKOUT_THRESHOLD": 45,
+        "RATE_LIMIT_ACTIVATED":true,
+        "RATE_LIMIT_ATTEMPTS": 10,
+        "RATE_LIMIT_LOCK_SEC": 60,
+        "CAPTCHA_ACTIVATED":false,
+        "CAPTCHA_THRESHOLD":20
+    },
+    "lockout_only": {
+        "AUTOMATION_GEN_USERS_HASH_MODE":0,
+        "AUTOMATION_GEN_USERS_TOTP":false,
+        "LOCKOUT_ACTIVATED":true,
+        "LOCKOUT_THRESHOLD": 45,
+        "RATE_LIMIT_ACTIVATED":false,
+        "RATE_LIMIT_ATTEMPTS": 10,
+        "RATE_LIMIT_LOCK_SEC": 60,
+        "CAPTCHA_ACTIVATED":false,
+        "CAPTCHA_THRESHOLD":20
+    },
+    "totp_only": {
+        "AUTOMATION_GEN_USERS_HASH_MODE":0,
+        "AUTOMATION_GEN_USERS_TOTP":true,
+        "LOCKOUT_ACTIVATED":false,
+        "LOCKOUT_THRESHOLD": 45,
+        "RATE_LIMIT_ACTIVATED":false,
+        "RATE_LIMIT_ATTEMPTS": 10,
+        "RATE_LIMIT_LOCK_SEC": 60,
+        "CAPTCHA_ACTIVATED":false,
+        "CAPTCHA_THRESHOLD":20
+    },
+    "rate_limit_captcha": {
+        "AUTOMATION_GEN_USERS_HASH_MODE":0,
+        "AUTOMATION_GEN_USERS_TOTP":false,
+        "LOCKOUT_ACTIVATED":false,
+        "LOCKOUT_THRESHOLD": 45,
+        "RATE_LIMIT_ACTIVATED":true,
+        "RATE_LIMIT_ATTEMPTS": 10,
+        "RATE_LIMIT_LOCK_SEC": 60,
+        "CAPTCHA_ACTIVATED":true,
+        "CAPTCHA_THRESHOLD":20
+    },
+    "all_defence": {
+        "AUTOMATION_GEN_USERS_HASH_MODE":0,
+        "AUTOMATION_GEN_USERS_TOTP":true,
+        "LOCKOUT_ACTIVATED":true,
+        "LOCKOUT_THRESHOLD": 45,
+        "RATE_LIMIT_ACTIVATED":true,
+        "RATE_LIMIT_ATTEMPTS": 10,
+        "RATE_LIMIT_LOCK_SEC": 60,
+        "CAPTCHA_ACTIVATED":true,
+        "CAPTCHA_THRESHOLD":20
+    }
+}

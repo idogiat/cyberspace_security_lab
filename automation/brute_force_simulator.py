@@ -377,10 +377,9 @@ class BruteForceSimulator:
 if __name__ == "__main__":
     base_dir = os.path.dirname(__file__)
     user_path = os.path.join(base_dir, "../src/users.json")
-    weak_path = os.path.join(base_dir, "easy.txt")
-    medium_path = os.path.join(base_dir, "medium.txt")
-    strong_path = os.path.join(base_dir, "strong.txt")
-    
+    weak_path = os.path.join(base_dir, "passwords_weak.txt")
+    medium_path = os.path.join(base_dir, "passwords_medium.txt")
+    strong_path = os.path.join(base_dir, "passwords_strong.txt")
 
     sim = BruteForceSimulator(
         users_file=user_path,
