@@ -32,6 +32,7 @@ A project that investigates protection mechanisms for password authentication
 - configure the config.json file prior to running the server:
 ```
   "AUTOMATION_GEN_USERS_HASH_MODE":0,  # 0 = 'Argon2' / 1 = 'bcrypt' / 2 = 'SHA-256 + SALT' 
+  "AUTOMATION_GEN_USERS_TOTP":false,   # strong level automated users [true/false]
   "LOCKOUT_ACTIVATED":false,           # user lockout [true/false]
   "LOCKOUT_THRESHOLD": 20,             # login attempts until lockout is activated [int]
   "RATE_LIMIT_ACTIVATED":false,        # Rate Limit lockout [true/false]
@@ -59,13 +60,13 @@ output:
 ```
 
 $ python app.py --help
-usage: app.py [-h] [--gen] [--BF_attack] [--PS_attack]
+usage: app.py [-h] [--gen] [--attack]
 
 options:
   -h, --help   show this help message and exit
   --gen        Generate test users
-  --BF_attack  Run brute force simulator
-  --PS_attack  Run password spray simulator 
+  --attack     Run brute force simulator
+
 ```
 
 choose your flag and run it accordingly

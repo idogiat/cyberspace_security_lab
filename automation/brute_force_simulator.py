@@ -56,13 +56,14 @@ class BruteForceSimulator:
     MAX_ATTEMPTS_PER_USER = 50_000
     MAX_TOTAL_ATTEMPTS = 1_000_000
     MAX_RUNTIME = 2 * 60 * 60  # 2 hours
+    COUNTER = 0
 
     def __init__(self, users_file: str, weak_file: str, medium_file: str, strong_file: str):
         self.users_file = users_file
         self.weak_file = weak_file
         self.medium_file = medium_file
         self.strong_file = strong_file
-
+        self.num_of_lockouts = 0
         self.users = self._load_users()
         self.passwords_by_category = self._load_passwords()
         self.start_time = time.time()
@@ -107,7 +108,7 @@ class BruteForceSimulator:
             return 'medium'
         if 'strong' in username:
             return 'strong'
-        return 'other'
+        return 'medium' # defualt for other users
 
     @staticmethod
     def is_totp_required(resp: dict) -> bool:
@@ -143,6 +144,7 @@ class BruteForceSimulator:
             "username": username,
             "password_found": None,
             "attempts": 0,
+            "locked": True,
             "cracked": False,
             "time_to_success": None,
             "latency_sum":0.0,
@@ -186,6 +188,8 @@ class BruteForceSimulator:
 
             # Permanent lock
             if status == 423 or "permanently locked" in resp.get("message", "").lower():
+                self.num_of_lockouts += 1
+                user_stats["locked"] = True
                 stop_event.set()
                 return
 
@@ -244,6 +248,7 @@ class BruteForceSimulator:
 
 
 
+
     def _mark_success(self, user_stats, password, start, totp=False):
         user_stats["cracked"] = True
         user_stats["password_found"] = password
@@ -275,6 +280,7 @@ class BruteForceSimulator:
             results = list(executor.map(self.attack_user_multithreaded, users, [threads_per_user]*len(users)))
 
         self.total_attempts = sum(u["attempts"] for u in results)
+        self.num_of_lockouts = sum(u["locked"]==True for u in results)
         self.num_cracked = sum(1 for u in results if u["cracked"] and not u["totp_stopped"])
         self.time_to_first_success = min([u["time_to_success"] for u in results if u["cracked"] and u["time_to_success"]], default=None)
         self.global_latency = sum(u["latency_sum"] for u in results)
@@ -318,12 +324,12 @@ class BruteForceSimulator:
             cracked = sum(1 for u in users if u["cracked"] and not u["totp_stopped"])
             totp = sum(1 for u in users if u["totp_stopped"])
             total_totp_blocked += totp
-            print(f"{cat}: cracked={cracked}, totp_blocked={totp}, total={len(users)}")
+            print(f"{cat}: cracked={cracked}, totp_blocked={totp}, total users={len(users)}")
             entry = {
             "Category": cat,
             "Cracked": cracked,
             "TOTP Blocked": totp,
-            "Total": len(users)
+            "Total users": len(users)
             }
             summary_data.append(entry)
 
@@ -331,16 +337,12 @@ class BruteForceSimulator:
         print(f"\nTotal attempts: {self.total_attempts}")
         print(f"Attempts/sec: {self.total_attempts / duration:.2f}")
         
-        success_rate = self.num_cracked / self.num_users * 100 if self.num_users else 0
-        if self.time_to_first_success is not None:
-            print(f"\nTime to first success: {self.time_to_first_success:.2f} seconds")
-        else:
-            print("\nTime to first success: No user cracked.")
-        print(f"Success rate: {success_rate:.2f}%")
+
 
         if self.global_latency:
             avg_latency = (self.global_latency) / (self.total_attempts)
             print(f"Avg latency (ms): {avg_latency:.2f}")
+        print(f"number of users that got lockout: {self.num_of_lockouts}")
         print(f"Avg cpu: {self.avg_cpu}%")
         print(f"Avg RAM: {self.avg_mem}%")
 
@@ -351,20 +353,15 @@ class BruteForceSimulator:
             print("\nTime to first success: No user cracked.")
         print(f"Success rate: {success_rate:.2f}%")
 
-        if self.global_latency:
-            avg_latency = self.global_latency / self.total_attempts
-            print(f"Avg latency (ms): {avg_latency:.2f}")
 
-        if self.summary["cpu"]:
-            print(f"Avg CPU: {sum(self.summary['cpu'])/len(self.summary['cpu']):.1f}%")
-        if self.summary["mem"]:
-            print(f"Avg RAM: {sum(self.summary['mem'])/len(self.summary['mem']):.1f}%")
+
 
         summary_row = {
             "attack duration": duration,
             "Total attempts": self.total_attempts,
             "Total successes": self.num_cracked,
             "Total TOTP blocked": total_totp_blocked,
+            "Total users that got lockout": self.num_of_lockouts,
             "Attempts per second": self.total_attempts / duration if duration > 0 else 0,
             "Time to first success": self.time_to_first_success if self.time_to_first_success else None,
             "Success rate (%)": self.num_cracked / self.num_users * 100 if self.num_users else 0,
@@ -385,9 +382,9 @@ class BruteForceSimulator:
 if __name__ == "__main__":
     base_dir = os.path.dirname(__file__)
     user_path = os.path.join(base_dir, "../src/users.json")
-    weak_path = os.path.join(base_dir, "passwords_weak.txt")
-    medium_path = os.path.join(base_dir, "passwords_medium.txt")
-    strong_path = os.path.join(base_dir, "passwords_strong.txt")
+    weak_path = os.path.join(base_dir, "easy.txt")
+    medium_path = os.path.join(base_dir, "medium.txt")
+    strong_path = os.path.join(base_dir, "strong.txt")
     
 
     sim = BruteForceSimulator(
