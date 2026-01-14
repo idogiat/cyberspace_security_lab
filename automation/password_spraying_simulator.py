@@ -301,10 +301,32 @@ class PASSWORDSPRAYSIMULATOR():
         success_rate = self.num_cracked / self.num_users * 100 if self.num_users else 0
         print(f"Success rate: {success_rate:.2f}%")
 
-        with pandas.ExcelWriter("password_spray_summary.xlsx") as writer:
-            pandas.DataFrame(summary_data).to_excel(writer, sheet_name='Per Category', index=False)
+        summary_row = {
+            "attack duration": duration,
+            "Total attempts": self.total_attempts,
+            "Total successes": self.num_cracked,
+            "Total TOTP blocked": total_totp_blocked,
+            "Total users that got lockout": self.num_of_lockouts,
+            "Attempts per second": self.total_attempts / duration if duration > 0 else 0,
+            "Time to first success": self.time_to_first_success if self.time_to_first_success else None,
+            "Success rate (%)": self.num_cracked / self.num_users * 100 if self.num_users else 0,
+            "Avg latency (ms)": (self.global_latency / self.total_attempts) if self.global_latency else None,
+            "Avg CPU (%)": self.avg_cpu,
+            "Avg RAM (%)": self.avg_mem
+        }
 
-        print("[✓] password_spray_summary.xlsx written!")
+
+        df = pandas.DataFrame(summary_data)
+        total_df = pandas.DataFrame([summary_row])
+        with open("password_spray_summary.csv", "a", encoding="utf-8", newline="") as f:
+            f.write("\n\n ::: password_spray_summary ::: \n")  
+            now = time.strftime("run ended at  %H:%M %d/%m/%Y\n")
+            f.write(now)  
+            df.to_csv(f, index=False, header=True)
+            f.write("\n\n")  
+            f.write("Totals\n") 
+            total_df.to_csv(f, index=False, header=True)
+        print("[✓] password_spray_summary.csv written!")
 
 
 if __name__ == "__main__":

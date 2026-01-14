@@ -139,7 +139,7 @@ class BruteForceSimulator:
             "username": username,
             "password_found": None,
             "attempts": 0,
-            "locked": True,
+            "locked": False,
             "cracked": False,
             "time_to_success": None,
             "latency_sum":0.0,
@@ -157,6 +157,8 @@ class BruteForceSimulator:
         user_start = time.time()
 
         def worker(password: str):
+
+            
             if stop_event.is_set() or shutdown_event.is_set():
                 return
 
@@ -275,7 +277,7 @@ class BruteForceSimulator:
             results = list(executor.map(self.attack_user_multithreaded, users, [threads_per_user]*len(users)))
 
         self.total_attempts = sum(u["attempts"] for u in results)
-        self.num_of_lockouts = sum(u["locked"]==True for u in results)
+        self.num_of_lockouts = sum(u["locked"] for u in results)
         self.num_cracked = sum(1 for u in results if u["cracked"] and not u["totp_stopped"])
         self.time_to_first_success = min([u["time_to_success"] for u in results if u["cracked"] and u["time_to_success"]], default=None)
         self.global_latency = sum(u["latency_sum"] for u in results)
@@ -367,10 +369,15 @@ class BruteForceSimulator:
 
         df = pandas.DataFrame(summary_data)
         total_df = pandas.DataFrame([summary_row])
-        with pandas.ExcelWriter("brute_force_summary.xlsx") as writer:
-            df.to_excel(writer, sheet_name='Per Category', index=False)
-            total_df.to_excel(writer, sheet_name='Totals', index=False)
-        print("[✓] brute_force_summary.xlsx written!")
+        with open("brute_force_summary.csv", "a", encoding="utf-8", newline="") as f:
+            f.write("\n\n ::: brute force run ::: \n")  
+            now = time.strftime("run ended at  %H:%M %d/%m/%Y\n")
+            f.write(now)  
+            df.to_csv(f, index=False, header=True)
+            f.write("\n")  
+            f.write("Totals\n") 
+            total_df.to_csv(f, index=False, header=True)
+        print("[✓] brute_force_summary.csv written!")
 
 
 

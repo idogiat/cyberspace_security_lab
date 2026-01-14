@@ -25,6 +25,7 @@ with open(CONFIG_PATH, 'r') as f:
     CONFIG = json.load(f)
 HASH_MODE = CONFIG.get('AUTOMATION_GEN_USERS_HASH_MODE', 1)
 TOTP_ACTIVATED = CONFIG.get("AUTOMATION_GEN_USERS_TOTP", False)
+PEPPER_ACTIVATED = CONFIG.get("Automated_GEN_USERS_PEPPER", False)
 
 MAX_WEAK   = 5_000
 MAX_MEDIUM = 10_000
@@ -231,6 +232,8 @@ def generate_users():
         args.enable_totp = TOTP_ACTIVATED
         totp_secret = pyotp.random_base32() if args.enable_totp else None
         hash_mode = list(HashingAlgorithm)[HASH_MODE].value
+        if use_pepper == True and PEPPER_ACTIVATED == False:
+            use_pepper = False
         payload = {
             "username": username,
             "password": password,

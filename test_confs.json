@@ -3,6 +3,19 @@
     "no_defence": {
         "AUTOMATION_GEN_USERS_HASH_MODE":0,
         "AUTOMATION_GEN_USERS_TOTP":false,
+        "Automated_GEN_USERS_PEPPER":false,
+        "LOCKOUT_ACTIVATED":false,
+        "LOCKOUT_THRESHOLD": 45,
+        "RATE_LIMIT_ACTIVATED":false,
+        "RATE_LIMIT_ATTEMPTS": 10,
+        "RATE_LIMIT_LOCK_SEC": 60,
+        "CAPTCHA_ACTIVATED":false,
+        "CAPTCHA_THRESHOLD":20
+    },
+    "pepper_only": {
+        "AUTOMATION_GEN_USERS_HASH_MODE":0,
+        "AUTOMATION_GEN_USERS_TOTP":false,
+        "Automated_GEN_USERS_PEPPER":true,
         "LOCKOUT_ACTIVATED":false,
         "LOCKOUT_THRESHOLD": 45,
         "RATE_LIMIT_ACTIVATED":false,
@@ -14,6 +27,7 @@
     "captcha_only": {
         "AUTOMATION_GEN_USERS_HASH_MODE":0,
         "AUTOMATION_GEN_USERS_TOTP":false,
+        "Automated_GEN_USERS_PEPPER":true,
         "LOCKOUT_ACTIVATED":false,
         "LOCKOUT_THRESHOLD": 45,
         "RATE_LIMIT_ACTIVATED":false,
@@ -25,6 +39,7 @@
     "rate_limit_only": {
         "AUTOMATION_GEN_USERS_HASH_MODE":0,
         "AUTOMATION_GEN_USERS_TOTP":false,
+        "Automated_GEN_USERS_PEPPER":false,
         "LOCKOUT_ACTIVATED":false,
         "LOCKOUT_THRESHOLD": 45,
         "RATE_LIMIT_ACTIVATED":true,
@@ -36,6 +51,7 @@
     "lockout_only": {
         "AUTOMATION_GEN_USERS_HASH_MODE":0,
         "AUTOMATION_GEN_USERS_TOTP":false,
+        "Automated_GEN_USERS_PEPPER":false,
         "LOCKOUT_ACTIVATED":true,
         "LOCKOUT_THRESHOLD": 45,
         "RATE_LIMIT_ACTIVATED":false,
@@ -47,6 +63,7 @@
     "totp_only": {
         "AUTOMATION_GEN_USERS_HASH_MODE":0,
         "AUTOMATION_GEN_USERS_TOTP":true,
+        "Automated_GEN_USERS_PEPPER":false,
         "LOCKOUT_ACTIVATED":false,
         "LOCKOUT_THRESHOLD": 45,
         "RATE_LIMIT_ACTIVATED":false,
@@ -55,9 +72,10 @@
         "CAPTCHA_ACTIVATED":false,
         "CAPTCHA_THRESHOLD":20
     },
-    "rate_limit_captcha": {
+    "rate_limit_captcha_pepper": {
         "AUTOMATION_GEN_USERS_HASH_MODE":0,
         "AUTOMATION_GEN_USERS_TOTP":false,
+        "Automated_GEN_USERS_PEPPER":true,
         "LOCKOUT_ACTIVATED":false,
         "LOCKOUT_THRESHOLD": 45,
         "RATE_LIMIT_ACTIVATED":true,
@@ -69,6 +87,7 @@
     "all_defence": {
         "AUTOMATION_GEN_USERS_HASH_MODE":0,
         "AUTOMATION_GEN_USERS_TOTP":true,
+        "Automated_GEN_USERS_PEPPER":true,
         "LOCKOUT_ACTIVATED":true,
         "LOCKOUT_THRESHOLD": 45,
         "RATE_LIMIT_ACTIVATED":true,

@@ -28,6 +28,7 @@ def signal_handler(sig, frame):
 
 def update_configuration(AUTOMATION_GEN_USERS_HASH_MODE: int =0,
                         AUTOMATION_GEN_USERS_TOTP: bool = False,
+                        Automated_GEN_USERS_PEPPER: bool = False,
                         LOCKOUT_ACTIVATED: bool = False,
                         LOCKOUT_THRESHOLD: int = 45,
                         RATE_LIMIT_ACTIVATED: bool = False,
@@ -43,6 +44,7 @@ def update_configuration(AUTOMATION_GEN_USERS_HASH_MODE: int =0,
         config.update({
             "AUTOMATION_GEN_USERS_HASH_MODE": AUTOMATION_GEN_USERS_HASH_MODE,
             "AUTOMATION_GEN_USERS_TOTP": AUTOMATION_GEN_USERS_TOTP,
+            "Automated_GEN_USERS_PEPPER":Automated_GEN_USERS_PEPPER,
             "LOCKOUT_ACTIVATED": LOCKOUT_ACTIVATED,
             "LOCKOUT_THRESHOLD": LOCKOUT_THRESHOLD,
             "RATE_LIMIT_ACTIVATED": RATE_LIMIT_ACTIVATED,
