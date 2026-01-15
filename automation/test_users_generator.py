@@ -28,8 +28,9 @@ TOTP_ACTIVATED = CONFIG.get("USERS_TOTP", False)
 PEPPER_ACTIVATED = CONFIG.get("USERS_PEPPER", False)
 
 MAX_WEAK   = 5_000
-MAX_MEDIUM = 10_000
-MAX_STRONG = 50_000
+MAX_MEDIUM = 7_000
+MAX_STRONG = 15_000
+PASS_SPRAYING = 1_667
 
 BASE_DIR = Path(os.path.dirname(__file__))
 
@@ -165,17 +166,18 @@ def generate_combined_passwords(out_file="combined_passwords.txt"):
     with open(STRONG_FILE, encoding="utf-8") as f:
         strong_pwds = [line.strip() for line in f if line.strip()]
 
-    weak_part = random.sample(weak_pwds, MAX_WEAK)
-    medium_part = random.sample(medium_pwds, MAX_MEDIUM)
-    strong_part = random.sample(strong_pwds, MAX_STRONG)
+    weak_part = random.sample(weak_pwds, PASS_SPRAYING)
+    medium_part = random.sample(medium_pwds, PASS_SPRAYING)
+    strong_part = random.sample(strong_pwds, PASS_SPRAYING)
 
     all_pwds = weak_part + medium_part + strong_part
     random.shuffle(all_pwds)
-
+    passwords = "\n".join(list(all_pwds))
+    
     outpath = BASE_DIR / out_file
-    with open(outpath, "w", encoding="utf-8") as f:
+    with open(outpath, "w") as f:
         for p in all_pwds:
-            f.write(p + "\n")
+            f.write(passwords)
     print(f"Combined password file written to: {outpath}")
 
 
