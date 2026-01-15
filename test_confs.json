@@ -1,7 +1,7 @@
 {
 
     "no_defence": {
-        "AUTOMATION_GEN_USERS_HASH_MODE":0,
+        "AUTOMATION_GEN_USERS_HASH_MODE":3,
         "AUTOMATION_GEN_USERS_TOTP":false,
         "Automated_GEN_USERS_PEPPER":false,
         "LOCKOUT_ACTIVATED":false,
@@ -13,7 +13,7 @@
         "CAPTCHA_THRESHOLD":20
     },
     "pepper_only": {
-        "AUTOMATION_GEN_USERS_HASH_MODE":0,
+        "AUTOMATION_GEN_USERS_HASH_MODE":3,
         "AUTOMATION_GEN_USERS_TOTP":false,
         "Automated_GEN_USERS_PEPPER":true,
         "LOCKOUT_ACTIVATED":false,
@@ -25,7 +25,7 @@
         "CAPTCHA_THRESHOLD":20
     },
     "captcha_only": {
-        "AUTOMATION_GEN_USERS_HASH_MODE":0,
+        "AUTOMATION_GEN_USERS_HASH_MODE":3,
         "AUTOMATION_GEN_USERS_TOTP":false,
         "Automated_GEN_USERS_PEPPER":true,
         "LOCKOUT_ACTIVATED":false,
@@ -37,7 +37,7 @@
         "CAPTCHA_THRESHOLD":20
     },
     "rate_limit_only": {
-        "AUTOMATION_GEN_USERS_HASH_MODE":0,
+        "AUTOMATION_GEN_USERS_HASH_MODE":3,
         "AUTOMATION_GEN_USERS_TOTP":false,
         "Automated_GEN_USERS_PEPPER":false,
         "LOCKOUT_ACTIVATED":false,
@@ -49,7 +49,7 @@
         "CAPTCHA_THRESHOLD":20
     },
     "lockout_only": {
-        "AUTOMATION_GEN_USERS_HASH_MODE":0,
+        "AUTOMATION_GEN_USERS_HASH_MODE":3,
         "AUTOMATION_GEN_USERS_TOTP":false,
         "Automated_GEN_USERS_PEPPER":false,
         "LOCKOUT_ACTIVATED":true,
@@ -61,7 +61,7 @@
         "CAPTCHA_THRESHOLD":20
     },
     "totp_only": {
-        "AUTOMATION_GEN_USERS_HASH_MODE":0,
+        "AUTOMATION_GEN_USERS_HASH_MODE":3,
         "AUTOMATION_GEN_USERS_TOTP":true,
         "Automated_GEN_USERS_PEPPER":false,
         "LOCKOUT_ACTIVATED":false,
@@ -73,7 +73,7 @@
         "CAPTCHA_THRESHOLD":20
     },
     "rate_limit_captcha_pepper": {
-        "AUTOMATION_GEN_USERS_HASH_MODE":0,
+        "AUTOMATION_GEN_USERS_HASH_MODE":3,
         "AUTOMATION_GEN_USERS_TOTP":false,
         "Automated_GEN_USERS_PEPPER":true,
         "LOCKOUT_ACTIVATED":false,
@@ -85,7 +85,7 @@
         "CAPTCHA_THRESHOLD":20
     },
     "all_defence": {
-        "AUTOMATION_GEN_USERS_HASH_MODE":0,
+        "AUTOMATION_GEN_USERS_HASH_MODE":3,
         "AUTOMATION_GEN_USERS_TOTP":true,
         "Automated_GEN_USERS_PEPPER":true,
         "LOCKOUT_ACTIVATED":true,

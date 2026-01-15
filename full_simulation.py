@@ -85,8 +85,8 @@ def save_results(name: str) -> None:
 
     shutil.copy(base_path / "results.txt", path / "results.txt")
     shutil.copy(base_path / "attempts.log", path / "attempts.log")
-    shutil.copy(base_path / "password_spray_summary.xlsx", path / "password_spray_summary.xlsx")
-    shutil.copy(base_path / "brute_force_summary.xlsx", path / "brute_force_summary.xlsx")
+    shutil.copy(base_path / "password_spray_summary.csv", path / "password_spray_summary.csv")
+    shutil.copy(base_path / "brute_force_summary.csv", path / "brute_force_summary.csv")
     shutil.copy(base_path / "user.db", path / "user.db")
 
 

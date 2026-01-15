@@ -265,7 +265,7 @@ class PASSWORDSPRAYSIMULATOR():
                 cpu_vals.append(us["cpu_sum"] / us["cpu_count"])
             if us["mem_count"]:
                 mem_vals.append(us["mem_sum"] / us["mem_count"])
-
+            
         self.avg_cpu = sum(cpu_vals) / len(cpu_vals) if cpu_vals else 0
         self.avg_mem = sum(mem_vals) / len(mem_vals) if mem_vals else 0
 
@@ -306,7 +306,6 @@ class PASSWORDSPRAYSIMULATOR():
             "Total attempts": self.total_attempts,
             "Total successes": self.num_cracked,
             "Total TOTP blocked": total_totp_blocked,
-            "Total users that got lockout": self.num_of_lockouts,
             "Attempts per second": self.total_attempts / duration if duration > 0 else 0,
             "Time to first success": self.time_to_first_success if self.time_to_first_success else None,
             "Success rate (%)": self.num_cracked / self.num_users * 100 if self.num_users else 0,
