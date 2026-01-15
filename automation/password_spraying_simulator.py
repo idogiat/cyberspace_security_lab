@@ -292,7 +292,7 @@ class PASSWORDSPRAYSIMULATOR():
                 "TOTP Blocked": totp,
                 "Total": len(users)
             })
-
+        
         print(f"\nTotal attempts: {self.total_attempts}")
         print(f"Attempts/sec: {self.total_attempts / duration:.2f}")
         print(f"Avg CPU: {self.avg_cpu}%")
