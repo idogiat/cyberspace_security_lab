@@ -310,6 +310,12 @@ class DB:
         except Exception as e:
             print(f"Error getting total users: {e}")
             return 0
+    
+    def close(self):
+        try:
+            self.connection.close()
+        except Exception:
+            pass
 
 
 def test_db():
