@@ -1,7 +1,7 @@
 {
-    "AUTOMATION_GEN_USERS_HASH_MODE": 0,
-    "AUTOMATION_GEN_USERS_TOTP": false,
-    "Automated_GEN_USERS_PEPPER": false,
+    "USERS_HASH_MODE": 1,
+    "USERS_TOTP": false,
+    "USERS_PEPPER": false,
     "LOCKOUT_ACTIVATED": false,
     "LOCKOUT_THRESHOLD": 45,
     "RATE_LIMIT_ACTIVATED": false,

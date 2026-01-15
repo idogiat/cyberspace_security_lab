@@ -28,9 +28,9 @@ A project that investigates protection mechanisms for password authentication
         ```
 - configure the config.json file prior to running the server:
 ```
-  "AUTOMATION_GEN_USERS_HASH_MODE":0,  # 0 = 'Argon2' / 1 = 'bcrypt' / 2 = 'SHA-256 + SALT'  / 3 = equal combination of all 3
-  "AUTOMATION_GEN_USERS_TOTP":false,   # strong level automated users [true/false]
-  "Automated_GEN_USERS_PEPPER":false"  # pepper usage for automated users [true/false]
+  "USERS_HASH_MODE":0,  # 0 = 'Argon2' / 1 = 'bcrypt' / 2 = 'SHA-256 + SALT'
+  "USERS_TOTP":false,   # strong level automated users [true/false]
+  "USERS_PEPPER":false"  # pepper usage for automated users [true/false]
   "LOCKOUT_ACTIVATED":false,           # user lockout [true/false]
   "LOCKOUT_THRESHOLD": 20,             # login attempts until lockout is activated [int]
   "RATE_LIMIT_ACTIVATED":false,        # Rate Limit lockout [true/false]
@@ -40,7 +40,7 @@ A project that investigates protection mechanisms for password authentication
   "CAPTCHA_THRESHOLD":20               # login attempts until Captcha is activated [int]
 ```
 
-* "AUTOMATION_GEN_USERS_HASH_MODE" is used for Generate test users automation (`python ./app.py --gen`)
+* "USERS_HASH_MODE" is used for Generate test users automation (`python ./app.py --gen`)
 
 - Run the following commands:
 ```

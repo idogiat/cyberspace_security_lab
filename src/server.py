@@ -7,11 +7,13 @@ import qrcode
 import base64
 import secrets
 import logging
+import signal
 
 from io import BytesIO
 from datetime import timedelta, datetime
 from flask import Flask, render_template, request, jsonify, redirect, session, url_for
 
+from Database import DB
 from common import ServerStatus
 
 
@@ -57,7 +59,9 @@ CAPTCHA_THRESHOLD = CONFIG.get('CAPTCHA_THRESHOLD', 20)
 # }
 user_login_attempts = {}
 
-from Database import DB
+
+# Initialize database (Database.py handles check_same_thread=False)
+db = DB()
 
 # Set up login attempt logger
 login_logger = logging.getLogger('login_attempts')
@@ -68,6 +72,32 @@ if not login_logger.handlers:
     login_logger.addHandler(handler)
     login_logger.setLevel(logging.INFO)
 
+
+def shutdown_logging():
+    logger = logging.getLogger('login_attempts')
+    handlers = logger.handlers[:]
+    for h in handlers:
+        try:
+            h.close()
+        except Exception:
+            pass
+        logger.removeHandler(h)
+
+def shutdown_db():
+    try:
+        db.close()
+    except Exception:
+        pass
+
+
+def signal_handler(sig, frame):
+    print(f"\n[!] Received signal {sig}, shutting down...")
+    shutdown_db()
+    shutdown_logging()
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)   # Ctrl+C
+signal.signal(signal.SIGTERM, signal_handler)  # kill / docker stop
 
 def get_or_create_captcha_token(username):
     """return a new or existing captcha token for a specific username"""
@@ -95,8 +125,7 @@ app = Flask(__name__, template_folder='templates')
 app.secret_key = 'your-secret-key-change-in-production'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
 
-# Initialize database (Database.py handles check_same_thread=False)
-db = DB()
+
 
 @app.route('/')
 def index():
@@ -583,7 +612,10 @@ def create_app():
     print("Starting Flask server on http://0.0.0.0:5000")
     print("Open http://localhost:5000 in your browser")
     print("Database initialized at users.db")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, use_reloader=False)
 
 if __name__ == '__main__':
     create_app()
+    shutdown_db()
+    shutdown_logging()
+    

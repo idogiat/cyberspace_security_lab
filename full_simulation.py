@@ -26,25 +26,25 @@ def signal_handler(sig, frame):
     sys.exit(0)
 
 
-def update_configuration(AUTOMATION_GEN_USERS_HASH_MODE: int =0,
-                        AUTOMATION_GEN_USERS_TOTP: bool = False,
-                        Automated_GEN_USERS_PEPPER: bool = False,
-                        LOCKOUT_ACTIVATED: bool = False,
-                        LOCKOUT_THRESHOLD: int = 45,
-                        RATE_LIMIT_ACTIVATED: bool = False,
-                        RATE_LIMIT_ATTEMPTS: int = 10,
-                        RATE_LIMIT_LOCK_SEC: int = 60,
-                        CAPTCHA_ACTIVATED: bool = False,
-                        CAPTCHA_THRESHOLD: int = 20) -> None:
+def update_configuration(USERS_HASH_MODE: int = 0,
+                         USERS_TOTP: bool = False,
+                         USERS_PEPPER: bool = False,
+                         LOCKOUT_ACTIVATED: bool = False,
+                         LOCKOUT_THRESHOLD: int = 45,
+                         RATE_LIMIT_ACTIVATED: bool = False,
+                         RATE_LIMIT_ATTEMPTS: int = 10,
+                         RATE_LIMIT_LOCK_SEC: int = 60,
+                         CAPTCHA_ACTIVATED: bool = False,
+                         CAPTCHA_THRESHOLD: int = 20) -> None:
     
     config_path = Path(__file__).parent / "src" / "config.json"
     config: dict = {}
     with open(config_path, "r") as f:
         config = json.load(f)
         config.update({
-            "AUTOMATION_GEN_USERS_HASH_MODE": AUTOMATION_GEN_USERS_HASH_MODE,
-            "AUTOMATION_GEN_USERS_TOTP": AUTOMATION_GEN_USERS_TOTP,
-            "Automated_GEN_USERS_PEPPER":Automated_GEN_USERS_PEPPER,
+            "USERS_HASH_MODE": USERS_HASH_MODE,
+            "USERS_TOTP": USERS_TOTP,
+            "USERS_PEPPER": USERS_PEPPER,
             "LOCKOUT_ACTIVATED": LOCKOUT_ACTIVATED,
             "LOCKOUT_THRESHOLD": LOCKOUT_THRESHOLD,
             "RATE_LIMIT_ACTIVATED": RATE_LIMIT_ACTIVATED,
@@ -57,37 +57,61 @@ def update_configuration(AUTOMATION_GEN_USERS_HASH_MODE: int =0,
         json.dump(config, f, indent=4)
 
 def clean_environment() -> None:
-    path = Path(__file__).parent
+    base = Path(__file__).parent
     print("=== Cleaning Environment ===")
-    (path / "test_credentials.json").unlink(missing_ok=True)
-    (path / "attempts.log").unlink(missing_ok=True)
-    (path / "automation" / "passwords_weak.txt").unlink(missing_ok=True)
-    (path / "automation" / "passwords_medium.txt").unlink(missing_ok=True)
-    (path / "automation" / "passwords_strong.txt").unlink(missing_ok=True)
-    (path / "automation" / "combined_passwords.txt").unlink(missing_ok=True)
-    (path / "results.txt").unlink(missing_ok=True)
-    (path / "users.db").unlink(missing_ok=True)
+
+    files_to_remove = [
+        base / "test_credentials.json",
+        base / "attempts.log",
+        base / "results.txt",
+        base / "users.db",
+        base / "password_spray_summary.csv",
+        base / "brute_force_summary.csv",
+        base / "automation" / "passwords_weak.txt",
+        base / "automation" / "passwords_medium.txt",
+        base / "automation" / "passwords_strong.txt",
+        base / "automation" / "combined_passwords.txt",
+    ]
+
+    for f in files_to_remove:
+        try:
+            f.unlink()
+        except FileNotFoundError:
+            print(f"[!] File {f} not found, skipping.")
+        except Exception as e:
+            print(f"[!] Error removing file {f}: {e}")
 
 
-    config: dict = {}
-    with open("src/users.json", "r") as f:
-        config = json.load(f)
-        config["users"] = []
+    # Reset users.json cleanly
+    users_path = base / "src" / "users.json"
+    with open(users_path, "r") as f:
+        data = json.load(f)
 
-    with open("src/users.json", "w") as f:
-        json.dump(config, f, indent=4)
+    data["users"] = []
+
+    with open(users_path, "w") as f:
+        json.dump(data, f, indent=4)
+
 
 def save_results(name: str) -> None:
+    base = Path(__file__).parent
+    dst = base / "results" / name
+    dst.mkdir(parents=True, exist_ok=True)
 
-    base_path = Path(__file__).parent
-    path = base_path / "results" / name
-    os.makedirs(path, exist_ok=True)
+    files_to_save = [
+        "results.txt",
+        "attempts.log",
+        "password_spray_summary.csv",
+        "brute_force_summary.csv",
+        "users.db",
+    ]
 
-    shutil.copy(base_path / "results.txt", path / "results.txt")
-    shutil.copy(base_path / "attempts.log", path / "attempts.log")
-    shutil.copy(base_path / "password_spray_summary.csv", path / "password_spray_summary.csv")
-    shutil.copy(base_path / "brute_force_summary.csv", path / "brute_force_summary.csv")
-    shutil.copy(base_path / "user.db", path / "user.db")
+    for filename in files_to_save:
+        src = base / filename
+        if src.exists():
+            shutil.copy(src, dst / filename)
+        else:
+            print(f"[!] Missing {filename} — skipping")
 
 
 if __name__ == "__main__":

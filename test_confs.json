@@ -1,9 +1,33 @@
 {
 
-    "no_defence": {
-        "AUTOMATION_GEN_USERS_HASH_MODE":0,
-        "AUTOMATION_GEN_USERS_TOTP":false,
-        "Automated_GEN_USERS_PEPPER":false,
+    "no_defence_hash_Argon2": {
+        "USERS_HASH_MODE":0,
+        "USERS_TOTP":false,
+        "USERS_PEPPER":false,
+        "LOCKOUT_ACTIVATED":false,
+        "LOCKOUT_THRESHOLD": 45,
+        "RATE_LIMIT_ACTIVATED":false,
+        "RATE_LIMIT_ATTEMPTS": 10,
+        "RATE_LIMIT_LOCK_SEC": 60,
+        "CAPTCHA_ACTIVATED":false,
+        "CAPTCHA_THRESHOLD":20
+    },
+    "no_defence_hash_bcrypt": {
+        "USERS_HASH_MODE":1,
+        "USERS_TOTP":false,
+        "USERS_PEPPER":false,
+        "LOCKOUT_ACTIVATED":false,
+        "LOCKOUT_THRESHOLD": 45,
+        "RATE_LIMIT_ACTIVATED":false,
+        "RATE_LIMIT_ATTEMPTS": 10,
+        "RATE_LIMIT_LOCK_SEC": 60,
+        "CAPTCHA_ACTIVATED":false,
+        "CAPTCHA_THRESHOLD":20
+    },
+    "no_defence_hash_SHA_256_SALT": {
+        "USERS_HASH_MODE":2,
+        "USERS_TOTP":false,
+        "USERS_PEPPER":false,
         "LOCKOUT_ACTIVATED":false,
         "LOCKOUT_THRESHOLD": 45,
         "RATE_LIMIT_ACTIVATED":false,
@@ -13,9 +37,9 @@
         "CAPTCHA_THRESHOLD":20
     },
     "pepper_only": {
-        "AUTOMATION_GEN_USERS_HASH_MODE":0,
-        "AUTOMATION_GEN_USERS_TOTP":false,
-        "Automated_GEN_USERS_PEPPER":true,
+        "USERS_HASH_MODE":0,
+        "USERS_TOTP":false,
+        "USERS_PEPPER":true,
         "LOCKOUT_ACTIVATED":false,
         "LOCKOUT_THRESHOLD": 45,
         "RATE_LIMIT_ACTIVATED":false,
@@ -25,9 +49,9 @@
         "CAPTCHA_THRESHOLD":20
     },
     "captcha_only": {
-        "AUTOMATION_GEN_USERS_HASH_MODE":0,
-        "AUTOMATION_GEN_USERS_TOTP":false,
-        "Automated_GEN_USERS_PEPPER":true,
+        "USERS_HASH_MODE":0,
+        "USERS_TOTP":false,
+        "USERS_PEPPER":true,
         "LOCKOUT_ACTIVATED":false,
         "LOCKOUT_THRESHOLD": 45,
         "RATE_LIMIT_ACTIVATED":false,
@@ -37,9 +61,9 @@
         "CAPTCHA_THRESHOLD":20
     },
     "rate_limit_only": {
-        "AUTOMATION_GEN_USERS_HASH_MODE":0,
-        "AUTOMATION_GEN_USERS_TOTP":false,
-        "Automated_GEN_USERS_PEPPER":false,
+        "USERS_HASH_MODE":0,
+        "USERS_TOTP":false,
+        "USERS_PEPPER":false,
         "LOCKOUT_ACTIVATED":false,
         "LOCKOUT_THRESHOLD": 45,
         "RATE_LIMIT_ACTIVATED":true,
@@ -49,9 +73,9 @@
         "CAPTCHA_THRESHOLD":20
     },
     "lockout_only": {
-        "AUTOMATION_GEN_USERS_HASH_MODE":0,
-        "AUTOMATION_GEN_USERS_TOTP":false,
-        "Automated_GEN_USERS_PEPPER":false,
+        "USERS_HASH_MODE":0,
+        "USERS_TOTP":false,
+        "USERS_PEPPER":false,
         "LOCKOUT_ACTIVATED":true,
         "LOCKOUT_THRESHOLD": 45,
         "RATE_LIMIT_ACTIVATED":false,
@@ -61,9 +85,9 @@
         "CAPTCHA_THRESHOLD":20
     },
     "totp_only": {
-        "AUTOMATION_GEN_USERS_HASH_MODE":0,
-        "AUTOMATION_GEN_USERS_TOTP":true,
-        "Automated_GEN_USERS_PEPPER":false,
+        "USERS_HASH_MODE":0,
+        "USERS_TOTP":true,
+        "USERS_PEPPER":false,
         "LOCKOUT_ACTIVATED":false,
         "LOCKOUT_THRESHOLD": 45,
         "RATE_LIMIT_ACTIVATED":false,
@@ -73,9 +97,9 @@
         "CAPTCHA_THRESHOLD":20
     },
     "rate_limit_captcha_pepper": {
-        "AUTOMATION_GEN_USERS_HASH_MODE":0,
-        "AUTOMATION_GEN_USERS_TOTP":false,
-        "Automated_GEN_USERS_PEPPER":true,
+        "USERS_HASH_MODE":0,
+        "USERS_TOTP":false,
+        "USERS_PEPPER":true,
         "LOCKOUT_ACTIVATED":false,
         "LOCKOUT_THRESHOLD": 45,
         "RATE_LIMIT_ACTIVATED":true,
@@ -85,9 +109,9 @@
         "CAPTCHA_THRESHOLD":20
     },
     "all_defence": {
-        "AUTOMATION_GEN_USERS_HASH_MODE":0,
-        "AUTOMATION_GEN_USERS_TOTP":true,
-        "Automated_GEN_USERS_PEPPER":true,
+        "USERS_HASH_MODE":0,
+        "USERS_TOTP":true,
+        "USERS_PEPPER":true,
         "LOCKOUT_ACTIVATED":true,
         "LOCKOUT_THRESHOLD": 45,
         "RATE_LIMIT_ACTIVATED":true,

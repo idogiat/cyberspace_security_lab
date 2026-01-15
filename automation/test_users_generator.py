@@ -23,9 +23,9 @@ from src.common import ServerStatus, HashingAlgorithm
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), '../src/config.json')
 with open(CONFIG_PATH, 'r') as f:
     CONFIG = json.load(f)
-HASH_MODE = CONFIG.get('AUTOMATION_GEN_USERS_HASH_MODE', 1)
-TOTP_ACTIVATED = CONFIG.get("AUTOMATION_GEN_USERS_TOTP", False)
-PEPPER_ACTIVATED = CONFIG.get("Automated_GEN_USERS_PEPPER", False)
+HASH_MODE = CONFIG.get('USERS_HASH_MODE', 1)
+TOTP_ACTIVATED = CONFIG.get("USERS_TOTP", False)
+PEPPER_ACTIVATED = CONFIG.get("USERS_PEPPER", False)
 
 MAX_WEAK   = 5_000
 MAX_MEDIUM = 10_000
@@ -165,9 +165,9 @@ def generate_combined_passwords(out_file="combined_passwords.txt"):
     with open(STRONG_FILE, encoding="utf-8") as f:
         strong_pwds = [line.strip() for line in f if line.strip()]
 
-    weak_part = random.sample(weak_pwds, 1667)
-    medium_part = random.sample(medium_pwds, 1667)
-    strong_part = random.sample(strong_pwds, 1666)
+    weak_part = random.sample(weak_pwds, MAX_WEAK)
+    medium_part = random.sample(medium_pwds, MAX_MEDIUM)
+    strong_part = random.sample(strong_pwds, MAX_STRONG)
 
     all_pwds = weak_part + medium_part + strong_part
     random.shuffle(all_pwds)
